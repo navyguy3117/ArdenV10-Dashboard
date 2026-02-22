@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-size: 15px;
+}
+
+body {
+  margin: 0;
+  font-family: 'Space Grotesk', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: radial-gradient(circle at top, #201040 0, #020212 60%);
+  color: #e5e7eb;
+  /* Prevent OS high-contrast from nuking our neon palette */
+  forced-color-adjust: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shared neon/glass visual language
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.glass-panel {
+  position: relative;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.78));
+  box-shadow:
+    0 0 45px rgba(79, 242, 242, 0.32),
+    0 0 90px rgba(124, 58, 237, 0.28),
+    inset 0 0 60px rgba(79, 242, 242, 0.025);
+  backdrop-filter: blur(20px) saturate(1.3);
+}
+
+.neon-border-cyan {
+  box-shadow:
+    0 0 0 1px rgba(79, 242, 242, 0.55),
+    0 0 28px rgba(79, 242, 242, 0.70),
+    0 0 56px rgba(79, 242, 242, 0.30);
+}
+
+.neon-border-magenta {
+  box-shadow:
+    0 0 0 1px rgba(255, 75, 225, 0.55),
+    0 0 28px rgba(255, 75, 225, 0.70),
+    0 0 56px rgba(255, 75, 225, 0.30);
+}
+
+.neon-border-purple {
+  box-shadow:
+    0 0 0 1px rgba(124, 58, 237, 0.55),
+    0 0 28px rgba(124, 58, 237, 0.70),
+    0 0 56px rgba(124, 58, 237, 0.30);
+}
+
+/* ── Router orbit ring ── */
+.router-core-ring {
+  border: 5px solid rgba(79, 242, 242, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(79, 242, 242, 0.10),
+    0 0 40px rgba(79, 242, 242, 0.70),
+    0 0 80px rgba(79, 242, 242, 0.35),
+    inset 0 0 40px rgba(79, 242, 242, 0.12);
+}
+
+/* ── RouterCore central node ── */
+.router-core-inner {
+  background:
+    radial-gradient(circle at 22% 0%, rgba(79, 242, 242, 0.88), transparent 55%),
+    radial-gradient(circle at 78% 100%, rgba(255, 75, 225, 0.78), transparent 58%),
+    radial-gradient(circle at center, rgba(15, 23, 42, 0.97), rgba(15, 23, 42, 0.92));
+  /* Baseline glow; overridden by Framer Motion pulse animation */
+  box-shadow:
+    0 0 55px rgba(79, 242, 242, 0.50),
+    0 0 110px rgba(255, 75, 225, 0.28);
+}
+
+/* ── Provider orbit nodes ── */
+.provider-node {
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background:
+    radial-gradient(circle at 30% 0%, rgba(79, 242, 242, 0.55), transparent 58%),
+    radial-gradient(circle at 70% 100%, rgba(255, 75, 225, 0.50), transparent 58%),
+    rgba(15, 23, 42, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(79, 242, 242, 0.18),
+    0 0 28px rgba(79, 242, 242, 0.60),
+    0 0 56px rgba(79, 242, 242, 0.25),
+    inset 0 0 20px rgba(0, 0, 0, 0.70);
+}
