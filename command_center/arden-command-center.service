@@ -1,0 +1,27 @@
+[Unit]
+Description=Arden // Command Center — OpenClaw Master Control Hub
+After=network.target
+StartLimitIntervalSec=30
+StartLimitBurst=5
+Documentation=https://github.com/openclaw/command-center
+
+[Service]
+Type=simple
+User=mikegg
+WorkingDirectory=/home/mikegg/.openclaw/workspace/command_center
+Environment=PYTHONUNBUFFERED=1
+Environment=HOME=/home/mikegg
+ExecStart=/home/mikegg/.openclaw/workspace/command_center/venv/bin/python main.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=arden-command-center
+
+# Resource limits (optional — comment out if causing issues)
+# MemoryMax=512M
+# CPUQuota=50%
+
+[Install]
+WantedBy=default.target
