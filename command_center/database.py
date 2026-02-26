@@ -121,6 +121,16 @@ class Database:
                     balance  REAL    DEFAULT 0.0,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+
+                CREATE TABLE IF NOT EXISTS chat_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    panel TEXT DEFAULT 'arden',
+                    messages_json TEXT DEFAULT '[]',
+                    first_message TEXT DEFAULT '',
+                    message_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_sessions_ts ON chat_sessions(created_at DESC);
             """)
             conn.commit()
             conn.close()
@@ -656,6 +666,44 @@ class Database:
             ).fetchall()
             conn.close()
             return [dict(r) for r in rows]
+
+    # ── CHAT SESSIONS ────────────────────────────────────────────────────────
+    def get_chat_sessions(self, limit: int = 50) -> List[Dict]:
+        with self._lock:
+            conn = self._get_conn()
+            rows = conn.execute(
+                "SELECT * FROM chat_sessions ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+            conn.close()
+            return [dict(r) for r in rows]
+
+    def save_chat_session(self, panel: str, messages_json: str,
+                          first_message: str = '', message_count: int = 0) -> Dict:
+        with self._lock:
+            conn = self._get_conn()
+            now = datetime.utcnow().isoformat()
+            cur = conn.execute(
+                "INSERT INTO chat_sessions (panel, messages_json, first_message, message_count, created_at) VALUES (?,?,?,?,?)",
+                (panel, messages_json, first_message, message_count, now)
+            )
+            conn.commit()
+            row = conn.execute("SELECT * FROM chat_sessions WHERE id=?", (cur.lastrowid,)).fetchone()
+            conn.close()
+            return dict(row)
+
+    def delete_chat_session(self, session_id: int):
+        with self._lock:
+            conn = self._get_conn()
+            conn.execute("DELETE FROM chat_sessions WHERE id=?", (session_id,))
+            conn.commit()
+            conn.close()
+
+    def clear_chat_sessions(self):
+        with self._lock:
+            conn = self._get_conn()
+            conn.execute("DELETE FROM chat_sessions")
+            conn.commit()
+            conn.close()
 
     # ── LAST ACTIVITY ────────────────────────────────────────────────────────
     def get_last_activity(self) -> Optional[Dict]:

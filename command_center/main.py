@@ -2321,6 +2321,95 @@ async def youtube_search(q: str, maxResults: int = 20):
         raise HTTPException(500, str(e))
 
 
+# ── API: Arden Neural Link (proxies to OpenClaw gateway) ──────────────────────
+@app.post("/api/chat/arden")
+async def chat_arden(payload: dict):
+    """Proxy messages directly to the OpenClaw gateway (Arden's brain)."""
+    import urllib.request as _ureq
+
+    messages = payload.get("messages", [])
+    if not messages:
+        raise HTTPException(400, "messages array is required")
+
+    # Read port + token from openclaw.json
+    try:
+        with open(OPENCLAW_JSON) as f:
+            cfg = json.load(f)
+        gw = cfg.get("gateway", {})
+        port  = gw.get("port", 18789)
+        token = gw.get("auth", {}).get("token", "")
+    except Exception:
+        port  = 18789
+        token = ""
+
+    req_body = json.dumps({
+        "model": "auto",
+        "messages": messages,
+        "max_tokens": 2048,
+        "stream": False,
+    }).encode("utf-8")
+
+    req = _ureq.Request(
+        f"http://127.0.0.1:{port}/v1/chat/completions",
+        data=req_body,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type":  "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with _ureq.urlopen(req, timeout=90) as resp:
+            result = json.loads(resp.read())
+        reply      = (result.get("choices") or [{}])[0].get("message", {}).get("content", "")
+        usage      = result.get("usage", {})
+        tokens_in  = usage.get("prompt_tokens", 0)
+        tokens_out = usage.get("completion_tokens", 0)
+        model      = result.get("model", "arden")
+        # Log the call so it shows up in routing stats
+        call = db.add_routing_call(
+            provider="arden",
+            model_name=model,
+            agent_name="arden-direct",
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            cost_usd=0.0,
+        )
+        await manager.broadcast("routing_call", call)
+        return {"reply": reply, "model": model,
+                "tokens_in": tokens_in, "tokens_out": tokens_out}
+    except Exception as e:
+        logger.error(f"Arden gateway error: {e}")
+        raise HTTPException(502, f"Gateway error: {str(e)[:120]}")
+
+
+# ── API: Chat Sessions ─────────────────────────────────────────────────────────
+@app.get("/api/sessions")
+async def get_sessions():
+    return db.get_chat_sessions()
+
+@app.post("/api/sessions")
+async def save_session(payload: dict):
+    session = db.save_chat_session(
+        panel=payload.get("panel", "arden"),
+        messages_json=json.dumps(payload.get("messages", [])),
+        first_message=payload.get("first_message", ""),
+        message_count=payload.get("message_count", 0),
+    )
+    return session
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: int):
+    db.delete_chat_session(session_id)
+    return {"status": "deleted"}
+
+@app.delete("/api/sessions")
+async def clear_sessions():
+    db.clear_chat_sessions()
+    return {"status": "cleared"}
+
+
 # ── API: Command ───────────────────────────────────────────────────────────────
 @app.post("/api/command")
 async def execute_command(payload: dict):
