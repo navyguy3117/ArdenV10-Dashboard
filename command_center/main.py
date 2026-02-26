@@ -51,6 +51,8 @@ TASKS_DIR       = Path(os.getenv("TASKS_DIR",     str(WORKSPACE / "tasks")))
 DB_PATH         = os.getenv("DB_PATH",            str(WORKSPACE / "command_center.db"))
 QUICK_LAUNCH_JSON = Path(os.getenv("QUICK_LAUNCH_JSON", str(WORKSPACE / "quick_launch.json")))
 LM_STUDIO_URL   = os.getenv("LM_STUDIO_URL",  "http://localhost:1234")
+CORTEX_URL      = os.getenv("CORTEX_URL",     "http://10.10.10.180:3100")
+ARDEN_KNOWLEDGE = WORKSPACE / "arden" / "knowledge"
 # Full path to powershell.exe for WSL2→Windows host metrics
 POWERSHELL      = "/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe"
 
@@ -108,7 +110,7 @@ LOG_LEVEL       = os.getenv("LOG_LEVEL", "INFO")
 # Ensure directories exist
 OBSERVER_DIR    = WORKSPACE / "imports" / "observer"
 
-for d in [AVATARS_DIR, UPLOADS_DIR, TASKS_DIR, OBSERVER_DIR]:
+for d in [AVATARS_DIR, UPLOADS_DIR, TASKS_DIR, OBSERVER_DIR, ARDEN_KNOWLEDGE]:
     d.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
@@ -208,6 +210,11 @@ _routing_calls_max = 200
 
 # ── SSE clients for telemetry stream ───────────────────────────────────────────
 _sse_clients: List = []  # asyncio.Queue instances
+
+# ── Cortex memory: conversation buffer for periodic ingest ────────────────────
+_cortex_conv_buffer: List[Dict] = []
+_cortex_last_ingest: str = datetime.utcnow().isoformat()
+_cortex_last_digest: str = ""  # ISO timestamp of last nightly digest
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def get_telegram_token() -> Optional[str]:
@@ -1377,6 +1384,150 @@ async def observer_file_writer():
             logger.error(f"Observer file writer: {e}")
 
 
+# ── Cortex: periodic conversation ingest (every 4 hours) ──────────────────────
+async def cortex_ingest_sender():
+    """Flush buffered Neural Link conversations to Cortex /api/memory/ingest."""
+    global _cortex_conv_buffer, _cortex_last_ingest
+    while True:
+        try:
+            await asyncio.sleep(4 * 60 * 60)  # every 4 hours
+            if not _cortex_conv_buffer:
+                continue
+            # Drain buffer
+            batch = _cortex_conv_buffer[:]
+            _cortex_conv_buffer = []
+            payload = {
+                "source": "neural_link",
+                "conversations": batch,
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{CORTEX_URL}/api/memory/ingest",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        _cortex_last_ingest = datetime.utcnow().isoformat()
+                        log_entry = db.add_log(
+                            f"Cortex ingest: {result.get('ingested', 0)} conversations "
+                            f"→ {result.get('stored', 0)} memories",
+                            "SUCCESS", "cortex")
+                        await manager.broadcast("new_log", log_entry)
+                        logger.info(f"Cortex ingest: {result}")
+                    else:
+                        # Put conversations back so we don't lose them
+                        _cortex_conv_buffer = batch + _cortex_conv_buffer
+                        logger.error(f"Cortex ingest failed: HTTP {resp.status}")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Cortex ingest sender: {e}")
+
+
+# ── Cortex: nightly digest + knowledge writer (1:00 AM UTC / ~9 PM EST) ───────
+async def cortex_nightly_digest():
+    """Fetch Arden's daily memory digest from Cortex and write knowledge MDs."""
+    global _cortex_last_digest
+    while True:
+        try:
+            # Calculate seconds until next 1:00 AM UTC (~9 PM EST)
+            now = datetime.utcnow()
+            target = now.replace(hour=1, minute=0, second=0, microsecond=0)
+            if now >= target:
+                target += timedelta(days=1)
+            wait_secs = (target - now).total_seconds()
+            await asyncio.sleep(wait_secs)
+
+            # Before fetching digest, flush any remaining conversations
+            if _cortex_conv_buffer:
+                batch = _cortex_conv_buffer[:]
+                _cortex_conv_buffer.clear()
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            f"{CORTEX_URL}/api/memory/ingest",
+                            json={"source": "neural_link", "conversations": batch},
+                            timeout=aiohttp.ClientTimeout(total=30),
+                        ) as resp:
+                            if resp.status == 200:
+                                logger.info("Pre-digest flush: conversations ingested")
+                except Exception as e:
+                    logger.error(f"Pre-digest flush failed: {e}")
+                    _cortex_conv_buffer.extend(batch)
+
+            # Fetch digest since last check (or last 24h)
+            since = _cortex_last_digest or (
+                datetime.utcnow() - timedelta(hours=24)).isoformat()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{CORTEX_URL}/api/memory/digest",
+                    params={"since": since},
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as resp:
+                    if resp.status != 200:
+                        logger.error(f"Cortex digest failed: HTTP {resp.status}")
+                        continue
+                    digest = await resp.json()
+
+            _cortex_last_digest = datetime.utcnow().isoformat()
+
+            # Write the raw digest as JSON for Arden to reference
+            digest_path = ARDEN_KNOWLEDGE / "latest_digest.json"
+            async with aiofiles.open(digest_path, "w") as f:
+                await f.write(json.dumps(digest, indent=2, default=str))
+
+            # Write a human-readable daily knowledge file
+            date_str = datetime.utcnow().strftime("%Y-%m-%d")
+            md_path = ARDEN_KNOWLEDGE / f"digest_{date_str}.md"
+            lines = [
+                f"# Arden's Daily Digest — {date_str}",
+                f"",
+                f"*Generated from Cortex memory at {datetime.utcnow().isoformat()} UTC*",
+                f"",
+            ]
+            memories = digest.get("memories", [])
+            if not memories:
+                lines.append("No new memories formed today.")
+            else:
+                # Group by type
+                by_type = {}
+                for mem in memories:
+                    mtype = mem.get("type", "unknown")
+                    by_type.setdefault(mtype, []).append(mem)
+
+                for mtype, mems in by_type.items():
+                    lines.append(f"## {mtype.title()} ({len(mems)})")
+                    lines.append("")
+                    for m in mems:
+                        summary = m.get("summary", m.get("content", ""))
+                        tags = m.get("tags", [])
+                        conf = m.get("confidence", "")
+                        lines.append(f"- {summary}")
+                        if tags:
+                            lines.append(f"  *Tags: {', '.join(tags)}*")
+                        if conf:
+                            lines.append(f"  *Confidence: {conf}*")
+                    lines.append("")
+
+            lines.append("---")
+            lines.append(f"*Source: Cortex @ {CORTEX_URL} | Memories: {len(memories)}*")
+
+            async with aiofiles.open(md_path, "w") as f:
+                await f.write("\n".join(lines) + "\n")
+
+            log_entry = db.add_log(
+                f"Cortex nightly digest: {len(memories)} memories → {md_path.name}",
+                "SUCCESS", "cortex")
+            await manager.broadcast("new_log", log_entry)
+            logger.info(f"Nightly digest written: {md_path}")
+
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Cortex nightly digest: {e}")
+
+
 # ── Lifespan ───────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -1399,6 +1550,8 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(local_pc_broadcaster()),
         asyncio.create_task(provider_balance_poller()),
         asyncio.create_task(observer_file_writer()),
+        asyncio.create_task(cortex_ingest_sender()),
+        asyncio.create_task(cortex_nightly_digest()),
     ]
 
     # Watchdog observer for tasks folder
@@ -2087,6 +2240,135 @@ async def get_observer_layout():
         "lmstudio":     _lm_studio_status,
         "snapshotAvailable": (OBSERVER_DIR / "current_view.png").exists(),
     }
+
+
+# ── API: Cortex (Arden's Memory) ─────────────────────────────────────────────
+
+@app.post("/api/cortex/ingest")
+async def cortex_manual_ingest():
+    """Manually flush buffered conversations to Cortex now."""
+    global _cortex_conv_buffer, _cortex_last_ingest
+    if not _cortex_conv_buffer:
+        return {"status": "empty", "message": "No conversations buffered"}
+    batch = _cortex_conv_buffer[:]
+    _cortex_conv_buffer = []
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{CORTEX_URL}/api/memory/ingest",
+                json={"source": "neural_link", "conversations": batch},
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as resp:
+                if resp.status == 200:
+                    result = await resp.json()
+                    _cortex_last_ingest = datetime.utcnow().isoformat()
+                    log_entry = db.add_log(
+                        f"Cortex manual ingest: {result.get('ingested', 0)} conversations "
+                        f"→ {result.get('stored', 0)} memories",
+                        "SUCCESS", "cortex")
+                    await manager.broadcast("new_log", log_entry)
+                    return result
+                else:
+                    _cortex_conv_buffer = batch + _cortex_conv_buffer
+                    raise HTTPException(502, f"Cortex returned HTTP {resp.status}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        _cortex_conv_buffer = batch + _cortex_conv_buffer
+        raise HTTPException(502, f"Cortex ingest failed: {str(e)[:120]}")
+
+
+@app.get("/api/cortex/digest")
+async def cortex_manual_digest(since: str = "", write: bool = False):
+    """Manually fetch Arden's memory digest from Cortex.
+    Pass ?write=true to also write knowledge MD files (like the nightly job does).
+    """
+    global _cortex_last_digest
+    if not since:
+        since = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{CORTEX_URL}/api/memory/digest",
+                params={"since": since},
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as resp:
+                if resp.status != 200:
+                    raise HTTPException(502, f"Cortex returned HTTP {resp.status}")
+                digest = await resp.json()
+
+        if write and digest.get("memories"):
+            _cortex_last_digest = datetime.utcnow().isoformat()
+            # Write latest_digest.json
+            (ARDEN_KNOWLEDGE / "latest_digest.json").write_text(
+                json.dumps(digest, indent=2), encoding="utf-8"
+            )
+            # Write dated MD
+            today = datetime.utcnow().strftime("%Y-%m-%d")
+            md_lines = [f"# Arden Memory Digest — {today}\n"]
+            md_lines.append(f"Source: Cortex @ {CORTEX_URL}\n")
+            md_lines.append(f"Total memories: {digest.get('total', 0)}\n")
+            for mtype in ("episodic", "semantic", "procedural"):
+                items = digest.get("memories", {}).get(mtype, [])
+                if items:
+                    md_lines.append(f"\n## {mtype.title()} ({len(items)})\n")
+                    for m in items:
+                        tags = ", ".join(m.get("tags", []))
+                        md_lines.append(
+                            f"- **{m.get('summary', 'No summary')}**"
+                            f"  (confidence: {m.get('confidence', '?')}, tags: {tags})\n"
+                        )
+            md_path = ARDEN_KNOWLEDGE / f"digest_{today}.md"
+            md_path.write_text("".join(md_lines), encoding="utf-8")
+            digest["knowledge_written"] = str(md_path)
+
+        return digest
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"Cortex digest failed: {str(e)[:120]}")
+
+
+@app.get("/api/cortex/status")
+async def cortex_status():
+    """Check Cortex connectivity and Arden's memory state."""
+    status = {
+        "cortex_url": CORTEX_URL,
+        "buffered_conversations": len(_cortex_conv_buffer),
+        "last_ingest": _cortex_last_ingest,
+        "last_digest": _cortex_last_digest or "never",
+        "knowledge_dir": str(ARDEN_KNOWLEDGE),
+    }
+    # Try to reach Cortex
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{CORTEX_URL}/health",
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as resp:
+                if resp.status == 200:
+                    status["cortex_health"] = "online"
+                    # Also get memory stats
+                    async with session.get(
+                        f"{CORTEX_URL}/api/memory/stats",
+                        timeout=aiohttp.ClientTimeout(total=5),
+                    ) as mr:
+                        if mr.status == 200:
+                            status["memory_stats"] = await mr.json()
+                else:
+                    status["cortex_health"] = f"unhealthy (HTTP {resp.status})"
+    except Exception as e:
+        status["cortex_health"] = f"unreachable ({str(e)[:80]})"
+    # Count knowledge files
+    try:
+        knowledge_files = list(ARDEN_KNOWLEDGE.glob("digest_*.md"))
+        status["knowledge_files"] = len(knowledge_files)
+        if knowledge_files:
+            latest = max(knowledge_files, key=lambda p: p.stat().st_mtime)
+            status["latest_knowledge"] = latest.name
+    except Exception:
+        status["knowledge_files"] = 0
+    return status
 
 
 # ── API: Notes ─────────────────────────────────────────────────────────────────
@@ -3069,6 +3351,37 @@ def _build_dashboard_context() -> str:
     except Exception:
         pass
 
+    # ── Arden's Cortex Knowledge ──
+    try:
+        # Include latest digest summary if available
+        digest_path = ARDEN_KNOWLEDGE / "latest_digest.json"
+        if digest_path.exists():
+            digest = json.loads(digest_path.read_text())
+            memories = digest.get("memories", [])
+            if memories:
+                lines.append(f"\n## CORTEX MEMORY (latest digest: {len(memories)} memories)")
+                for m in memories[:10]:
+                    mtype = m.get("type", "?")
+                    summary = m.get("summary", m.get("content", ""))[:150]
+                    lines.append(f"  [{mtype}] {summary}")
+        # Include recent knowledge MDs (titles only)
+        knowledge_files = sorted(ARDEN_KNOWLEDGE.glob("digest_*.md"), reverse=True)[:5]
+        if knowledge_files:
+            lines.append(f"\n## MY KNOWLEDGE FILES ({len(list(ARDEN_KNOWLEDGE.glob('digest_*.md')))} total)")
+            for kf in knowledge_files:
+                lines.append(f"  - {kf.name}")
+    except Exception:
+        pass
+
+    # ── Cortex Status ──
+    try:
+        lines.append(f"\n## CORTEX ({CORTEX_URL})")
+        lines.append(f"  Last ingest: {_cortex_last_ingest}")
+        lines.append(f"  Last digest: {_cortex_last_digest or 'never'}")
+        lines.append(f"  Buffered conversations: {len(_cortex_conv_buffer)}")
+    except Exception:
+        pass
+
     return "\n".join(lines)
 
 
@@ -3141,6 +3454,17 @@ async def chat_arden(payload: dict):
             cost_usd=0.0,
         )
         await manager.broadcast("routing_call", call)
+
+        # ── Buffer conversation for Cortex memory ingest ──────────
+        # Strip system messages (dashboard context), keep user + assistant only
+        user_msgs = [m for m in messages if m.get("role") in ("user", "assistant")]
+        if reply and user_msgs:
+            user_msgs.append({"role": "assistant", "content": reply})
+            _cortex_conv_buffer.append({
+                "timestamp": datetime.utcnow().isoformat(),
+                "messages": user_msgs,
+            })
+
         return {"reply": reply, "model": model,
                 "tokens_in": tokens_in, "tokens_out": tokens_out}
     except Exception as e:

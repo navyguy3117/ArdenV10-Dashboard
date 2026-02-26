@@ -2,7 +2,7 @@
 
 > **For:** Arden (Autonomous Intelligence v2.0)
 > **Last Updated:** 2026-02-26
-> **Version:** 1.1.0
+> **Version:** 1.2.0
 > **Author:** Claude Opus (build partner)
 
 Use this document to troubleshoot the Command Center dashboard. It covers every endpoint, every tile, every function, and every config value.
@@ -24,6 +24,8 @@ Use this document to troubleshoot the Command Center dashboard. It covers every 
 | Upload failing | [File Upload](#file-upload) |
 | Login wall showing | [Authentication](#authentication--security) |
 | Tiles not floating up on collapse | [Collapse Behavior](#collapse-float-up-behavior) |
+| Cortex offline / memories not saving | [Cortex Memory Pipeline](#cortex-memory-pipeline-ardens-long-term-memory) |
+| Observer snapshot not working | [Observer](#observer-ardens-eyes) |
 
 ---
 
@@ -39,10 +41,16 @@ Browser (index.html)
     |                               |--- avatar.py   (mood engine + image rotation)
     |                               |
     |                               |--- External APIs:
-    |                                     Anthropic, OpenAI, OpenRouter
-    |                                     LM Studio (localhost:1234)
-    |                                     LM Network (10.10.10.180:1234)
-    |                                     Telegram Bot API
+    |                               |     Anthropic, OpenAI, OpenRouter
+    |                               |     LM Studio (localhost:1234)
+    |                               |     LM Network (10.10.10.180:1234)
+    |                               |     Telegram Bot API
+    |                               |
+    |                               |--- Cortex Memory (10.10.10.180:3100):
+    |                                     POST /api/memory/ingest  (conversations → long-term memory)
+    |                                     GET  /api/memory/digest   (daily memory review)
+    |                                     6 agents: Secretary, Arden, Lyra, Researcher, Sentinel, Opus
+    |                                     Hybrid RAG: vector + FTS5 + recency
 ```
 
 **Stack:** FastAPI + vanilla JS + GridStack.js + SQLite
@@ -66,6 +74,8 @@ Browser (index.html)
 | `avatars/` | Avatar PNG images (6 moods x N variants) |
 | `imports/uploaded-docs/` | Uploaded files |
 | `tasks/` | Task .txt/.md files |
+| `arden/knowledge/` | Arden's self-written digest MDs (from Cortex) |
+| `imports/observer/` | Observer snapshots, layout.json, summary.txt |
 | `quick_launch.json` | Quick launch button config |
 | `/home/mikegg/.openclaw/openclaw.json` | Master config (API keys, Telegram token) |
 
@@ -114,6 +124,7 @@ venv/bin/python main.py
 | `LM_STUDIO_URL` | `http://localhost:1234` | LM Studio base URL |
 | `LOG_LEVEL` | `INFO` | Logging level |
 | `MONTHLY_BUDGET` | `60.0` | Monthly spend limit (USD) |
+| `CORTEX_URL` | `http://10.10.10.180:3100` | Arden's Cortex memory system |
 | `GIPHY_API_KEY` | *(optional)* | Giphy search API |
 | `CC_PASSWORD` | *(empty = auth disabled)* | Login wall password |
 | `CC_SECRET` | *(auto-generated)* | JWT signing key |
@@ -290,6 +301,14 @@ Restart the server. The dashboard will show a cyberpunk login screen. Without `C
 | `GET` | `/api/telemetry/system/local` | Windows host metrics |
 | `GET` | `/api/telemetry/system/agent` | WSL2 system metrics |
 | `GET` | `/api/telemetry/stream` | SSE real-time telemetry stream |
+
+### Cortex Memory (Arden's Long-Term Memory)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/api/cortex/ingest` | Manually flush buffered conversations to Cortex |
+| `GET` | `/api/cortex/digest` | Fetch Arden's memory digest (?since=ISO, ?write=true) |
+| `GET` | `/api/cortex/status` | Cortex health, buffer count, memory stats, knowledge files |
 
 ### Misc
 
@@ -625,6 +644,9 @@ These run continuously while the server is alive:
 | `budget_reset_checker` | 1h | Broadcast budget updates |
 | `activity_ticker` | 5s | Broadcast last activity |
 | `tasks_periodic` | 60s | Broadcast task list |
+| `observer_file_writer` | 30s | Write layout.json + summary.txt to observer dir |
+| `cortex_ingest_sender` | 4h | Flush buffered Neural Link conversations to Cortex |
+| `cortex_nightly_digest` | 1 AM UTC | Fetch daily memory digest, write knowledge MDs |
 | Watchdog | realtime | File changes in tasks/ directory |
 
 ---
@@ -870,6 +892,7 @@ The Observer writes files directly to `workspace/imports/observer/` that can be 
 | File | Updated | Description |
 |---|---|---|
 | `layout.json` | Every 30 seconds | Full layout + system data (same as `/api/observer/layout`) |
+| `summary.txt` | Every 30 seconds | Plain-English dashboard state (theme, stats, GPU, budget, tasks, agents) |
 | `current_view.png` | On each snapshot | Latest dashboard screenshot |
 | `snapshot_status.json` | On each snapshot | Metadata about the last capture (timestamp, size, path) |
 
@@ -919,6 +942,108 @@ The `/api/observer/layout` response includes:
 - The camera button only works when someone has the dashboard open in a browser.
 - Layout telemetry is always available regardless of whether the browser is open.
 - Arden reads these files/endpoints as reference only. All code changes go through Claude (vendor).
+
+---
+
+## Cortex Memory Pipeline (Arden's Long-Term Memory)
+
+Arden's Cortex is a multi-agent RAG system running on the RTX 4090 box (`10.10.10.180:3100`). It gives Arden persistent memory across sessions — conversations are ingested, processed by 6 agents, stored in hybrid vector/keyword search, and periodically reviewed to generate self-knowledge files.
+
+### Architecture
+
+```
+Arden Neural Link Chat
+    |
+    |--- User + Assistant messages captured to in-memory buffer
+    |
+    |--- cortex_ingest_sender (every 4 hours)
+    |         |
+    |         POST /api/memory/ingest  →  Cortex (10.10.10.180:3100)
+    |                                        |
+    |                                        |--- 6 agents process memories:
+    |                                        |    Secretary (Nemo 12B local)
+    |                                        |    Arden (Claude Sonnet)
+    |                                        |    Lyra (GPT-4o)
+    |                                        |    Researcher (Gemini Flash)
+    |                                        |    Sentinel (Nemo 12B local)
+    |                                        |    Opus (Claude Opus)
+    |                                        |
+    |                                        |--- Hybrid RAG storage:
+    |                                             Vector cosine (0.7 weight)
+    |                                             FTS5 keyword (0.3 weight)
+    |                                             Recency boost
+    |
+    |--- cortex_nightly_digest (1:00 AM UTC / ~9 PM EST)
+              |
+              GET /api/memory/digest  →  Cortex
+              |
+              Writes:
+                arden/knowledge/latest_digest.json
+                arden/knowledge/digest_YYYY-MM-DD.md
+```
+
+### How It Works
+
+1. **Capture:** Every Arden Neural Link conversation (user + assistant messages) is buffered in memory.
+2. **Ingest:** Every 4 hours, buffered conversations are flushed to Cortex via `POST /api/memory/ingest`. Cortex processes them through its 6-agent pipeline and stores as episodic, semantic, or procedural memories.
+3. **Nightly Digest:** At 1:00 AM UTC, the dashboard fetches Arden's accumulated memories via `GET /api/memory/digest`, then writes:
+   - `latest_digest.json` — raw JSON for programmatic access
+   - `digest_YYYY-MM-DD.md` — human-readable markdown grouped by memory type
+4. **Context Injection:** Arden's system prompt is enriched with her latest digest memories and knowledge file references, so she's aware of what she's learned.
+
+### Memory Types
+
+| Type | Description |
+|------|-------------|
+| **Episodic** | Specific events and interactions (who said what, when) |
+| **Semantic** | Factual knowledge and learned concepts |
+| **Procedural** | How-to knowledge, processes, workflows |
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/cortex/ingest` | `POST` | Manually flush all buffered conversations to Cortex now |
+| `/api/cortex/digest` | `GET` | Fetch memory digest. Params: `?since=ISO8601`, `?write=true` to also write knowledge MDs |
+| `/api/cortex/status` | `GET` | Full status: Cortex health, buffer count, memory stats, knowledge files, last ingest/digest timestamps |
+
+### File-Based Access
+
+| File | Location | Description |
+|---|---|---|
+| `latest_digest.json` | `arden/knowledge/` | Latest full digest from Cortex (raw JSON) |
+| `digest_YYYY-MM-DD.md` | `arden/knowledge/` | Daily knowledge digest in markdown format |
+
+### Status Response Example
+
+```json
+{
+  "cortex_url": "http://10.10.10.180:3100",
+  "buffered_conversations": 0,
+  "last_ingest": "2026-02-26T21:49:07.827210",
+  "last_digest": "2026-02-26T21:50:51.439071",
+  "cortex_health": "online",
+  "memory_stats": { "total": 10, "episodic": 0, "semantic": 4, "procedural": 6 },
+  "knowledge_files": 1,
+  "latest_knowledge": "digest_2026-02-26.md"
+}
+```
+
+### Troubleshooting
+
+- **Cortex offline** → Check `10.10.10.180:3100` is reachable: `curl -4 http://10.10.10.180:3100/health`
+- **Buffer not draining** → Manually flush: `curl -4 -X POST http://localhost:3000/api/cortex/ingest`
+- **No knowledge files** → Manually trigger: `curl -4 "http://localhost:3000/api/cortex/digest?write=true"`
+- **Conversations not buffering** → Ensure you're chatting through the Arden Neural Link panel (not General Chat)
+- **Nightly digest not running** → Check server logs, confirm server hasn't restarted (timer resets on restart)
+
+### Safety & Guardrails
+
+- Arden can READ her knowledge files but does NOT modify dashboard code or config
+- All code changes go through Claude (vendor) with Mike's (CEO) approval
+- Cortex processes memories through multiple agents for quality — no single point of failure
+- Buffer survives within a server session but not across restarts (conversations in buffer are lost on server restart)
+- Failed ingests put conversations back in the buffer for retry
 
 ---
 
