@@ -106,7 +106,9 @@ PORT            = int(os.getenv("PORT", "3000"))
 LOG_LEVEL       = os.getenv("LOG_LEVEL", "INFO")
 
 # Ensure directories exist
-for d in [AVATARS_DIR, UPLOADS_DIR, TASKS_DIR]:
+OBSERVER_DIR    = WORKSPACE / "imports" / "observer"
+
+for d in [AVATARS_DIR, UPLOADS_DIR, TASKS_DIR, OBSERVER_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
@@ -1246,6 +1248,135 @@ async def provider_balance_poller():
         await asyncio.sleep(60)
 
 
+# ── Observer: periodic file writer ─────────────────────────────────────────────
+async def observer_file_writer():
+    """Write layout.json to OBSERVER_DIR every 30s so Arden can read it
+    directly from the filesystem without needing to curl."""
+    while True:
+        try:
+            await asyncio.sleep(30)
+            budget = db.get_budget_summary()
+            stats = db.get_routing_stats()
+            metrics = _last_metrics or {}
+            tasks_list = []
+            try:
+                for tf in sorted(TASKS_DIR.iterdir()):
+                    if tf.suffix in ('.txt', '.md'):
+                        tasks_list.append({
+                            "name": tf.name,
+                            "content": tf.read_text(errors="replace")[:500]
+                        })
+            except Exception:
+                pass
+            layout_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "tiles": [
+                    {"id": "avatar",       "label": "Arden Avatar",      "zone": "A"},
+                    {"id": "aicore",       "label": "AI Core Status",    "zone": "A"},
+                    {"id": "routing",      "label": "Routing Monitor",   "zone": "A"},
+                    {"id": "jobs",         "label": "Active Jobs",       "zone": "A"},
+                    {"id": "lmstudio",     "label": "LM Studio",         "zone": "B"},
+                    {"id": "crons",        "label": "Scheduler",         "zone": "B"},
+                    {"id": "logs",         "label": "Live Logs",         "zone": "B"},
+                    {"id": "agents",       "label": "Agent Registry",    "zone": "B"},
+                    {"id": "media",        "label": "Media Panel",       "zone": "C"},
+                    {"id": "giphy",        "label": "Giphy",             "zone": "C"},
+                    {"id": "notes",        "label": "Notes",             "zone": "C"},
+                    {"id": "arden-chat",   "label": "Arden Neural Link", "zone": "D"},
+                    {"id": "sessions",     "label": "Sessions",          "zone": "D"},
+                    {"id": "chat",         "label": "General Chat",      "zone": "D"},
+                    {"id": "lmstudio-net", "label": "LM Network",        "zone": "E"},
+                    {"id": "rightpanel",   "label": "Context Panel",     "zone": "E"},
+                ],
+                "system": {
+                    "cpu_percent":    metrics.get("cpu_percent", 0),
+                    "memory_percent": metrics.get("memory_percent", 0),
+                    "gpu_percent":    metrics.get("gpu_percent"),
+                    "disk_percent":   metrics.get("disk_percent"),
+                    "net_in":         metrics.get("net_in"),
+                    "net_out":        metrics.get("net_out"),
+                    "uptime":         metrics.get("uptime"),
+                },
+                "budget":       budget,
+                "routingStats": stats,
+                "tasks":        tasks_list,
+                "agents":       db.get_agents(),
+                "jobs":         db.get_cron_jobs(),
+                "lmstudio":     _lm_studio_status,
+                "snapshotAvailable": (OBSERVER_DIR / "current_view.png").exists(),
+                "connectedBrowsers": len(manager.active),
+            }
+            layout_path = OBSERVER_DIR / "layout.json"
+            async with aiofiles.open(layout_path, "w") as f:
+                await f.write(json.dumps(layout_data, indent=2, default=str))
+
+            # ── summary.txt — plain-English dashboard state ──────────
+            sys = layout_data["system"]
+            bud = layout_data.get("budget", {})
+            lms = layout_data.get("lmstudio", {})
+            gpu_info = (lms.get("gpu") or {}) if isinstance(lms, dict) else {}
+            snap_exists = layout_data.get("snapshotAvailable", False)
+            snap_status_path = OBSERVER_DIR / "snapshot_status.json"
+            snap_line = "No snapshot yet"
+            if snap_exists and snap_status_path.exists():
+                try:
+                    ss = json.loads(snap_status_path.read_text())
+                    snap_line = (f"Yes — {ss.get('size_kb', '?')} KB, "
+                                 f"taken {ss.get('saved_at', '?')}")
+                except Exception:
+                    snap_line = "Yes (status file unreadable)"
+            elif snap_exists:
+                snap_line = "Yes (no status file)"
+
+            task_names = [t["name"] for t in layout_data.get("tasks", [])]
+            agent_list = layout_data.get("agents", [])
+            agent_statuses = {}
+            for a in agent_list:
+                s = a.get("status", "unknown")
+                agent_statuses[s] = agent_statuses.get(s, 0) + 1
+            agent_summary = ", ".join(f"{v} {k}" for k, v in agent_statuses.items())
+
+            gpu_str = (f"{gpu_info['name']} @ {gpu_info.get('temp_c', '?')}°C, "
+                       f"{gpu_info.get('util_pct', '?')}% util, "
+                       f"{gpu_info.get('mem_used_mb', '?')}/{gpu_info.get('mem_total_mb', '?')} MB VRAM"
+                       if gpu_info.get("name") else "N/A")
+
+            summary_lines = [
+                f"Dashboard Summary — {layout_data['timestamp']} UTC",
+                f"Theme: Electric Obsidian",
+                f"",
+                f"System (WSL2):",
+                f"  CPU:  {sys.get('cpu_percent', '?')}%",
+                f"  RAM:  {sys.get('memory_percent', '?')}%",
+                f"  GPU:  {gpu_str}",
+                f"  Disk: {sys.get('disk_percent', '?') or '?'}%",
+                f"",
+                f"Budget:",
+                f"  Spent:     ${bud.get('total_spent', 0):.2f} / ${bud.get('monthly_limit', 0):.2f}",
+                f"  Remaining: ${bud.get('remaining', 0):.2f} ({bud.get('percent_used', 0):.1f}% used)",
+                f"  Daily:     ${bud.get('daily_spent', 0):.2f} today",
+                f"",
+                f"Tasks ({len(task_names)}):",
+            ]
+            for tn in task_names:
+                summary_lines.append(f"  - {tn}")
+            summary_lines += [
+                f"",
+                f"Agents: {len(agent_list)} registered ({agent_summary})",
+                f"Browsers: {layout_data.get('connectedBrowsers', 0)} connected",
+                f"LM Studio: {'Online' if (lms.get('online') if isinstance(lms, dict) else False) else 'Offline'}",
+                f"Last Snapshot: {snap_line}",
+            ]
+
+            summary_path = OBSERVER_DIR / "summary.txt"
+            async with aiofiles.open(summary_path, "w") as f:
+                await f.write("\n".join(summary_lines) + "\n")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Observer file writer: {e}")
+
+
 # ── Lifespan ───────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -1267,6 +1398,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(tasks_periodic()),
         asyncio.create_task(local_pc_broadcaster()),
         asyncio.create_task(provider_balance_poller()),
+        asyncio.create_task(observer_file_writer()),
     ]
 
     # Watchdog observer for tasks folder
@@ -1806,6 +1938,155 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
 @app.get("/api/uploads")
 async def get_uploads(limit: int = 10):
     return db.get_uploads(limit)
+
+
+# ── API: Observer (Arden's Eyes) ──────────────────────────────────────────────
+
+@app.post("/api/observer/snapshot")
+async def save_observer_snapshot(payload: dict):
+    """Receive a base64 PNG screenshot of the dashboard from the frontend."""
+    import base64 as _b64
+    data = payload.get("image", "")
+    if not data:
+        raise HTTPException(400, "No image data provided")
+    # Strip data-URL prefix if present
+    if "," in data:
+        data = data.split(",", 1)[1]
+    try:
+        img_bytes = _b64.b64decode(data)
+    except Exception:
+        raise HTTPException(400, "Invalid base64 image data")
+    # Size guard – 10 MB max
+    if len(img_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(413, "Screenshot exceeds 10 MB limit")
+    # Save as current_view.png (always the latest)
+    current_path = OBSERVER_DIR / "current_view.png"
+    async with aiofiles.open(current_path, "wb") as f:
+        await f.write(img_bytes)
+    # Also save a timestamped copy
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    ts_path = OBSERVER_DIR / f"snapshot_{ts}.png"
+    async with aiofiles.open(ts_path, "wb") as f:
+        await f.write(img_bytes)
+    # Housekeeping — keep last 20 timestamped snapshots
+    snaps = sorted(OBSERVER_DIR.glob("snapshot_*.png"),
+                   key=lambda p: p.stat().st_mtime, reverse=True)
+    for old in snaps[20:]:
+        old.unlink(missing_ok=True)
+    size_kb = len(img_bytes) / 1024
+    log_entry = db.add_log(
+        f"Observer snapshot saved ({size_kb:.0f} KB)", "INFO", "observer")
+    await manager.broadcast("new_log", log_entry)
+    # Write status file so Arden can check via filesystem
+    status = {"status": "ok", "file": str(current_path),
+              "size_kb": round(size_kb, 1), "timestamp": ts,
+              "saved_at": datetime.utcnow().isoformat()}
+    async with aiofiles.open(OBSERVER_DIR / "snapshot_status.json", "w") as f:
+        await f.write(json.dumps(status, indent=2))
+    return status
+
+
+@app.get("/api/observer/snapshot")
+async def get_observer_snapshot():
+    """Serve the latest dashboard screenshot as PNG."""
+    from fastapi.responses import FileResponse
+    current_path = OBSERVER_DIR / "current_view.png"
+    if not current_path.exists():
+        raise HTTPException(404, "No snapshot available — capture one first")
+    return FileResponse(current_path, media_type="image/png")
+
+
+@app.get("/api/observer/snapshots")
+async def list_observer_snapshots(limit: int = 20):
+    """List available timestamped snapshots."""
+    snaps = sorted(OBSERVER_DIR.glob("snapshot_*.png"),
+                   key=lambda p: p.stat().st_mtime, reverse=True)[:limit]
+    return [{"name": s.name,
+             "size_kb": round(s.stat().st_size / 1024, 1),
+             "modified": datetime.fromtimestamp(s.stat().st_mtime).isoformat()}
+            for s in snaps]
+
+
+@app.post("/api/observer/trigger")
+async def trigger_observer_snapshot():
+    """Ask any connected browser to capture a snapshot via WebSocket.
+    Returns immediately — the browser will POST the image back to
+    /api/observer/snapshot asynchronously."""
+    connected = len(manager.active)
+    if connected == 0:
+        return {
+            "status": "no_browser",
+            "message": "No browser is connected via WebSocket. "
+                       "Open the dashboard in a browser first, "
+                       "or use /api/observer/layout for data-only access.",
+            "snapshotAvailable": (OBSERVER_DIR / "current_view.png").exists(),
+        }
+    await manager.broadcast("trigger_browser_snapshot", {
+        "requested_at": datetime.utcnow().isoformat()
+    })
+    return {
+        "status": "triggered",
+        "message": f"Snapshot request sent to {connected} connected browser(s). "
+                   "The image will be saved to imports/observer/current_view.png "
+                   "within a few seconds.",
+        "connected_browsers": connected,
+    }
+
+
+@app.get("/api/observer/layout")
+async def get_observer_layout():
+    """Enhanced telemetry with tile layout — Arden's spatial awareness map."""
+    budget = db.get_budget_summary()
+    stats = db.get_routing_stats()
+    metrics = _last_metrics or {}
+    # Gather tasks
+    tasks_list = []
+    try:
+        for tf in sorted(TASKS_DIR.iterdir()):
+            if tf.suffix in ('.txt', '.md'):
+                tasks_list.append({
+                    "name": tf.name,
+                    "content": tf.read_text(errors="replace")[:500]
+                })
+    except Exception:
+        pass
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "tiles": [
+            {"id": "avatar",       "label": "Arden Avatar",      "zone": "A"},
+            {"id": "aicore",       "label": "AI Core Status",    "zone": "A"},
+            {"id": "routing",      "label": "Routing Monitor",   "zone": "A"},
+            {"id": "jobs",         "label": "Active Jobs",       "zone": "A"},
+            {"id": "lmstudio",     "label": "LM Studio",         "zone": "B"},
+            {"id": "crons",        "label": "Scheduler",         "zone": "B"},
+            {"id": "logs",         "label": "Live Logs",         "zone": "B"},
+            {"id": "agents",       "label": "Agent Registry",    "zone": "B"},
+            {"id": "media",        "label": "Media Panel",       "zone": "C"},
+            {"id": "giphy",        "label": "Giphy",             "zone": "C"},
+            {"id": "notes",        "label": "Notes",             "zone": "C"},
+            {"id": "arden-chat",   "label": "Arden Neural Link", "zone": "D"},
+            {"id": "sessions",     "label": "Sessions",          "zone": "D"},
+            {"id": "chat",         "label": "General Chat",      "zone": "D"},
+            {"id": "lmstudio-net", "label": "LM Network",        "zone": "E"},
+            {"id": "rightpanel",   "label": "Context Panel",     "zone": "E"},
+        ],
+        "system": {
+            "cpu_percent":    metrics.get("cpu_percent", 0),
+            "memory_percent": metrics.get("memory_percent", 0),
+            "gpu_percent":    metrics.get("gpu_percent"),
+            "disk_percent":   metrics.get("disk_percent"),
+            "net_in":         metrics.get("net_in"),
+            "net_out":        metrics.get("net_out"),
+            "uptime":         metrics.get("uptime"),
+        },
+        "budget":       budget,
+        "routingStats": stats,
+        "tasks":        tasks_list,
+        "agents":       db.get_agents(),
+        "jobs":         db.get_cron_jobs(),
+        "lmstudio":     _lm_studio_status,
+        "snapshotAvailable": (OBSERVER_DIR / "current_view.png").exists(),
+    }
 
 
 # ── API: Notes ─────────────────────────────────────────────────────────────────
@@ -2669,6 +2950,128 @@ async def youtube_search(q: str, maxResults: int = 20):
 
 
 # ── API: Arden Neural Link (proxies to OpenClaw gateway) ──────────────────────
+def _build_dashboard_context() -> str:
+    """Build a concise snapshot of live dashboard state for Arden."""
+    lines = ["[DASHBOARD LIVE SNAPSHOT]"]
+    now = datetime.now()
+    lines.append(f"Timestamp: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # ── Tasks ──
+    try:
+        tasks = get_tasks()
+        pending = [t for t in tasks if not t["done"]]
+        done    = [t for t in tasks if t["done"]]
+        lines.append(f"\n## TASKS ({len(pending)} pending, {len(done)} done)")
+        for t in pending:
+            lines.append(f"  [ ] {t['title']}  ({t['modified_str']})")
+            if t.get("content", "").strip():
+                preview = t["content"].strip()[:120].replace("\n", " ")
+                lines.append(f"      {preview}")
+        for t in done:
+            lines.append(f"  [x] {t['title']}")
+    except Exception as e:
+        lines.append(f"\n## TASKS  (error: {e})")
+
+    # ── Budget ──
+    try:
+        budget = db.get_budget_summary()
+        balances = db.get_provider_balances()
+        lines.append(f"\n## BUDGET")
+        lines.append(f"  Monthly limit: ${budget.get('monthly_limit', 0):.2f}")
+        lines.append(f"  Spent this month: ${budget.get('total_spent', 0):.2f}")
+        lines.append(f"  Remaining: ${budget.get('remaining', 0):.2f}")
+        for prov, bal in (balances or {}).items():
+            lines.append(f"  {prov}: ${bal:.2f}")
+    except Exception:
+        pass
+
+    # ── Notes ──
+    try:
+        notes = db.get_notes()
+        if notes and notes.strip():
+            preview = notes.strip()[:300].replace("\n", " | ")
+            lines.append(f"\n## QUICK NOTES\n  {preview}")
+    except Exception:
+        pass
+
+    # ── System health ──
+    try:
+        m = _last_metrics or {}
+        gpu = _gpu_metrics or {}
+        lines.append(f"\n## SYSTEM (WSL2 Arden Node)")
+        if m:
+            lines.append(f"  CPU: {m.get('cpu_percent',0):.1f}%  RAM: {m.get('memory_percent',0):.1f}% ({m.get('memory_used_gb',0):.1f}/{m.get('memory_total_gb',0):.0f} GB)  Uptime: {int((m.get('uptime_s',0))/3600)}h")
+        if gpu:
+            lines.append(f"  GPU: {gpu.get('name','?')} — {gpu.get('util_pct',0):.0f}% util, {gpu.get('temp_c',0)}°C, {gpu.get('mem_used_mb',0):.0f}/{gpu.get('mem_total_mb',0):.0f} MB VRAM")
+        pc = _local_pc_metrics or {}
+        if pc.get("available"):
+            lines.append(f"  Local PC: {pc.get('cpu_name','')} — CPU {pc.get('cpu_pct',0):.0f}%  RAM {pc.get('ram_used_pct',0):.0f}%")
+    except Exception:
+        pass
+
+    # ── Agents ──
+    try:
+        agents = db.get_agents()
+        if agents:
+            lines.append(f"\n## AGENTS ({len(agents)} registered)")
+            for a in agents[:8]:
+                lines.append(f"  {a['display_name'] or a['name']}: {a.get('status','?')}  last: {a.get('last_action','')}")
+    except Exception:
+        pass
+
+    # ── Cron jobs ──
+    try:
+        crons = db.get_cron_jobs()
+        if crons:
+            lines.append(f"\n## SCHEDULER ({len(crons)} jobs)")
+            for c in crons:
+                lines.append(f"  {c['name']}: {c.get('last_status','?')} — last: {c.get('last_run','never')}")
+    except Exception:
+        pass
+
+    # ── Recent uploads ──
+    try:
+        uploads = db.get_uploads(limit=5)
+        if uploads:
+            lines.append(f"\n## RECENT UPLOADS")
+            for u in uploads:
+                sz = u.get("size", 0)
+                szk = f"{sz/1024:.1f}KB" if sz < 1048576 else f"{sz/1048576:.1f}MB"
+                lines.append(f"  {u.get('original_name', u.get('filename','?'))} ({szk})")
+    except Exception:
+        pass
+
+    # ── LM Studio / LM Network ──
+    try:
+        lm = _lm_studio_status or {}
+        lmn = _lm_studio_net_status or {}
+        if lm.get("online"):
+            models = ", ".join(lm.get("loaded_models", [])) or lm.get("model", "?")
+            lines.append(f"\n## LM STUDIO: ONLINE — {models}")
+        else:
+            lines.append(f"\n## LM STUDIO: OFFLINE")
+        if lmn.get("online"):
+            models = ", ".join(lmn.get("loaded_models", [])) or lmn.get("model", "?")
+            lines.append(f"## LM NETWORK (4090): ONLINE — {models}")
+        else:
+            lines.append(f"## LM NETWORK (4090): OFFLINE")
+    except Exception:
+        pass
+
+    # ── Providers ──
+    try:
+        stats = db.get_routing_stats()
+        if stats:
+            lines.append(f"\n## PROVIDER STATS (24h)")
+            for prov, s in stats.items():
+                if s.get("calls_today", 0):
+                    lines.append(f"  {prov}: {s['calls_today']} calls, ${s.get('cost_today',0):.4f}")
+    except Exception:
+        pass
+
+    return "\n".join(lines)
+
+
 @app.post("/api/chat/arden")
 async def chat_arden(payload: dict):
     """Proxy messages directly to the OpenClaw gateway (Arden's brain)."""
@@ -2677,6 +3080,20 @@ async def chat_arden(payload: dict):
     messages = payload.get("messages", [])
     if not messages:
         raise HTTPException(400, "messages array is required")
+
+    # Inject live dashboard context so Arden can see the dashboard state
+    dashboard_ctx = _build_dashboard_context()
+    ctx_msg = {
+        "role": "system",
+        "content": (
+            "You have access to the user's Command Center dashboard. "
+            "Below is a live snapshot of what is currently visible. "
+            "Use this data to answer questions about tasks, budget, "
+            "system health, agents, and anything else on the dashboard.\n\n"
+            + dashboard_ctx
+        ),
+    }
+    messages_with_ctx = [ctx_msg] + messages
 
     # Read port + token from openclaw.json
     try:
@@ -2691,7 +3108,7 @@ async def chat_arden(payload: dict):
 
     req_body = json.dumps({
         "model": "auto",
-        "messages": messages,
+        "messages": messages_with_ctx,
         "max_tokens": 2048,
         "stream": False,
     }).encode("utf-8")

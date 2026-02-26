@@ -84,6 +84,23 @@ Purpose:
 
 ---
 
+## Command Center Dashboard
+
+### Location
+- Backend: workspace/command_center/main.py (FastAPI on port 3000)
+- Frontend: workspace/command_center/static/index.html (single-page app)
+- Database: workspace/command_center/command_center.db (SQLite)
+
+### Quick Reference
+Full technical docs (all API endpoints, WebSocket events, grid layout,
+auth system, env vars, troubleshooting): see **DASHBOARD-REFERENCE.md**
+
+### Common Issues
+- Dashboard wont load → check if server is running: systemctl --user status arden-command-center
+- Tiles stacking wrong → click RESET TILES button in top nav
+- Auth locked out → unset CC_PASSWORD in .env and restart
+- WebSocket disconnects → check /health endpoint first
+
 ## Rules
 
 - Never claim work is running without evidence.

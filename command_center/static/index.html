@@ -10,8 +10,9 @@
 <style>
 :root{
   --bg:#0a0a0f;--bg2:#0d1117;--bg3:#0f1520;--bg4:#111a28;
-  --cyan:#00f0ff;--mag:#ff00c8;--green:#00ff88;--amber:#ffaa00;
-  --red:#ff3355;--purple:#aa88ff;--orange:#ff8800;--blue:#4488ff;--google:#4285f4;
+  --cyan:#22D3EE;--mag:#A78BFA;--green:#34D399;--amber:#F59E0B;
+  --red:#EF4444;--purple:#8B5CF6;--orange:#FB923C;--blue:#60A5FA;--google:#4285f4;
+  --violet:#8B5CF6;--ember:#FB923C;
   --text:#c8d8f0;--dim:#4a6080;--border:#1a2540;
   --mono:"JetBrains Mono","Fira Code",monospace;
   --hud:"Orbitron",monospace;
@@ -27,14 +28,14 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 @keyframes spinCCW{to{transform:rotate(-360deg);}}
 @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
 @keyframes bg-scan{from{transform:translateY(-100%)}to{transform:translateY(100%)}}
-@keyframes flash{0%{background:#00f0ff18}100%{background:transparent}}
+@keyframes flash{0%{background:#22D3EE18}100%{background:transparent}}
 @keyframes energy{from{stroke-dashoffset:80}to{stroke-dashoffset:0}}
 @keyframes cursor{0%,100%{opacity:1}50%{opacity:0}}
 @keyframes ping{0%{transform:scale(1);opacity:.8}50%{transform:scale(1.3);opacity:.3}100%{transform:scale(1);opacity:.8}}
-@keyframes sev-crit{0%,100%{box-shadow:0 0 6px #ff335544,0 0 0 1px #ff335522}
-  50%{box-shadow:0 0 22px #ff3355bb,0 0 0 1px #ff335577}}
+@keyframes sev-crit{0%,100%{box-shadow:0 0 6px #EF444444,0 0 0 1px #EF444422}
+  50%{box-shadow:0 0 22px #EF4444bb,0 0 0 1px #EF444477}}
 @keyframes sev-ring-flash{0%{outline:3px solid var(--cyan);outline-offset:0}
-  70%{outline:3px solid #00f0ff44;outline-offset:5px}100%{outline:0px solid transparent;outline-offset:6px}}
+  70%{outline:3px solid #22D3EE44;outline-offset:5px}100%{outline:0px solid transparent;outline-offset:6px}}
 .sev-flash-ring{animation:sev-ring-flash 2s ease-out!important;border-radius:6px;}
 @keyframes slide-in{from{transform:translateY(6px);opacity:0}to{transform:translateY(0);opacity:1}}
 
@@ -56,11 +57,11 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .pbadge{display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;
   border:1px solid;font-size:10px;font-weight:600;letter-spacing:1px;cursor:default;}
 .pbadge .dot{width:6px;height:6px;border-radius:50%;animation:pulse 2s infinite;}
-.pb-or{border-color:#ffaa0044;color:var(--amber);}
+.pb-or{border-color:#F59E0B44;color:var(--amber);}
 .pb-or .dot{background:var(--amber);box-shadow:0 0 5px var(--amber);}
-.pb-oa{border-color:#00f0ff44;color:var(--cyan);}
+.pb-oa{border-color:#22D3EE44;color:var(--cyan);}
 .pb-oa .dot{background:var(--cyan);box-shadow:0 0 5px var(--cyan);}
-.pb-an{border-color:#ff00c844;color:var(--mag);}
+.pb-an{border-color:#A78BFA44;color:var(--mag);}
 .pb-an .dot{background:var(--mag);box-shadow:0 0 5px var(--mag);}
 .pb-gg{border-color:#4285f444;color:var(--google);}
 .pb-gg .dot{background:var(--google);box-shadow:0 0 5px var(--google);}
@@ -98,7 +99,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 #ftr-input::placeholder{color:var(--dim);}
 .ftr-btn{padding:3px 10px;background:none;border:1px solid var(--cyan);
   color:var(--cyan);font-family:var(--mono);font-size:10px;cursor:pointer;border-radius:3px;}
-.ftr-btn:hover{background:#00f0ff18;}
+.ftr-btn:hover{background:#22D3EE18;}
 
 /* GRID LAYOUT — Gridstack handles positioning */
 .gs{padding:6px;}
@@ -125,9 +126,9 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
   transition:box-shadow .5s,border-color .5s;}
 .panel::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;
   background:linear-gradient(90deg,transparent,var(--cyan)44,transparent);}
-.tile-sev-ok  {box-shadow:0 0 8px #00ff8812;border-color:#00ff8820;}
-.tile-sev-warn{box-shadow:0 0 10px #ffaa0022;border-color:#ffaa0040;}
-.tile-sev-hot {box-shadow:0 0 16px #ff880035;border-color:#ff880055;}
+.tile-sev-ok  {box-shadow:0 0 8px #34D39912;border-color:#34D39920;}
+.tile-sev-warn{box-shadow:0 0 10px #F59E0B22;border-color:#F59E0B40;}
+.tile-sev-hot {box-shadow:0 0 16px #FB923C35;border-color:#FB923C55;}
 .tile-sev-crit{animation:sev-crit 4s ease-in-out infinite;}
 .ph{display:flex;justify-content:space-between;align-items:center;
   margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);
@@ -167,8 +168,8 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .av-img.fade{opacity:0;}
 .hr{position:absolute;top:0;left:0;right:0;bottom:0;border-radius:50%;
   border:2px solid transparent;pointer-events:none;}
-.hr1{border-top-color:var(--cyan);border-left-color:var(--cyan);
-  animation:spin 8s linear infinite;box-shadow:0 0 8px var(--cyan);}
+.hr1{border-top-color:var(--violet);border-left-color:var(--violet);
+  animation:spin 8s linear infinite;box-shadow:0 0 8px var(--violet);}
 .hr2{inset:5px;border-right-color:var(--mag);border-bottom-color:var(--mag);
   animation:spinCCW 12s linear infinite;}
 .hr3{inset:10px;border-top-color:var(--green);border-bottom-color:var(--green);
@@ -235,12 +236,12 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .eline{stroke-width:1.5;fill:none;opacity:.5;stroke-dasharray:6 4;
   animation:energy 1.5s linear infinite;}
 .rcore{grid-area:core;z-index:5;position:relative;width:74px;height:74px;
-  border-radius:50%;background:radial-gradient(circle,#1a2a4a,#0a1020 70%);
-  border:2px solid var(--cyan);display:flex;flex-direction:column;
+  border-radius:50%;background:radial-gradient(circle,#1a1a3a,#0a0820 70%);
+  border:2px solid var(--violet);display:flex;flex-direction:column;
   align-items:center;justify-content:center;animation:pulse 3s ease-in-out infinite;
-  box-shadow:0 0 12px #00f0ff44;}
+  box-shadow:0 0 12px #8B5CF644;}
 .rcore-lbl{font-family:var(--hud);font-size:7px;font-weight:700;
-  color:var(--cyan);letter-spacing:1px;text-align:center;}
+  color:var(--violet);letter-spacing:1px;text-align:center;}
 .rcore-sub{font-size:7px;color:var(--dim);margin-top:2px;}
 .pnodes{display:contents;}
 .pnode{position:relative;width:64px;height:64px;border-radius:50%;
@@ -383,9 +384,9 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .lm-btn{padding:4px 8px;background:none;font-family:var(--mono);font-size:9px;
   cursor:pointer;border-radius:3px;font-weight:600;}
 .lm-btn.load{border:1px solid var(--green);color:var(--green);}
-.lm-btn.load:hover{background:#00ff8820;}
+.lm-btn.load:hover{background:#34D39920;}
 .lm-btn.eject{border:1px solid var(--red);color:var(--red);}
-.lm-btn.eject:hover{background:#ff335520;}
+.lm-btn.eject:hover{background:#EF444420;}
 .lm-stats{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;}
 .lm-stat{background:#0a1020;border:1px solid var(--border);padding:3px 6px;border-radius:3px;}
 .lm-stat-lbl{font-size:8px;color:var(--dim);}
@@ -442,7 +443,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .media-url-input:focus{border-color:var(--cyan)55;}
 .media-load-btn{padding:4px 10px;background:none;border:1px solid var(--cyan);
   color:var(--cyan);font-family:var(--mono);font-size:9px;cursor:pointer;border-radius:3px;}
-.media-load-btn:hover{background:#00f0ff18;}
+.media-load-btn:hover{background:#22D3EE18;}
 .media-quick{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:6px;flex-shrink:0;}
 .mq-btn{padding:3px 8px;background:none;border:1px solid var(--border);
   color:var(--dim);font-family:var(--mono);font-size:9px;cursor:pointer;border-radius:3px;}
@@ -459,7 +460,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
   font-size:9px;padding:2px 7px;border-radius:3px;cursor:pointer;transition:all .15s;line-height:1.5;}
 .mc-btn:hover{border-color:var(--amber)88;color:var(--amber);}
 .mc-btn.mc-pp{border-color:var(--cyan)55;color:var(--cyan);min-width:28px;text-align:center;}
-.mc-btn.mc-pp:hover{border-color:var(--cyan);background:#00f0ff11;}
+.mc-btn.mc-pp:hover{border-color:var(--cyan);background:#22D3EE11;}
 
 /* ── YOUTUBE BROWSER ── */
 .yt-browser{flex:1;min-height:0;display:flex;flex-direction:column;gap:4px;}
@@ -471,7 +472,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
   font-family:var(--mono);font-size:9px;cursor:pointer;border-radius:3px;transition:all .15s;}
 .yt-btn:hover{border-color:var(--red)88;color:var(--red);}
 .yt-btn.yt-back{border-color:var(--amber)44;color:var(--amber);}
-.yt-btn.yt-back:hover{border-color:var(--amber);background:#ffaa0011;}
+.yt-btn.yt-back:hover{border-color:var(--amber);background:#F59E0B11;}
 .yt-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;
   overflow-y:auto;flex:1;padding:2px;}
 .yt-card{background:#0a1020;border:1px solid var(--border);border-radius:4px;
@@ -491,7 +492,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .giphy-input:focus{border-color:var(--mag)55;}
 .giphy-search-btn{padding:4px 10px;background:none;border:1px solid var(--mag);
   color:var(--mag);font-family:var(--mono);font-size:9px;cursor:pointer;border-radius:3px;flex-shrink:0;}
-.giphy-search-btn:hover{background:#ff00c818;}
+.giphy-search-btn:hover{background:#A78BFA18;}
 
 /* ── NOTES ── */
 .notes-area{flex:1;background:var(--bg2);border:1px solid var(--border);
@@ -505,9 +506,9 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .notes-btn{padding:3px 9px;background:none;font-family:var(--mono);font-size:9px;
   cursor:pointer;border-radius:3px;font-weight:600;}
 .nb-save{border:1px solid var(--cyan);color:var(--cyan);}
-.nb-save:hover{background:#00f0ff18;}
+.nb-save:hover{background:#22D3EE18;}
 .nb-task{border:1px solid var(--green);color:var(--green);}
-.nb-task:hover{background:#00ff8818;}
+.nb-task:hover{background:#34D39918;}
 .notes-toast{font-size:9px;color:var(--green);opacity:0;transition:opacity .3s;margin-left:6px;}
 .notes-toast.show{opacity:1;}
 
@@ -522,7 +523,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
   border-radius:5px;cursor:pointer;display:flex;flex-direction:column;align-items:center;
   justify-content:center;gap:2px;position:relative;transition:all .15s;
   color:var(--dim);flex-shrink:0;padding:0;}
-.sc-btn:hover{border-color:var(--cyan);background:#00f0ff0d;}
+.sc-btn:hover{border-color:var(--cyan);background:#22D3EE0d;}
 .sc-btn:hover .sc-ico{color:var(--cyan);}
 .sc-btn:hover .sc-lbl{color:var(--cyan);}
 .sc-ico{font-size:20px;line-height:1;color:var(--dim);transition:color .15s;}
@@ -578,10 +579,10 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .giphy-embed-wrap{display:flex;flex-direction:column;flex:1;gap:4px;min-height:0;}
 .giphy-back-btn{background:none;border:1px solid var(--mag)44;color:var(--mag);font-family:var(--mono);
   font-size:9px;padding:3px 8px;cursor:pointer;border-radius:3px;flex-shrink:0;align-self:flex-start;}
-.giphy-back-btn:hover{background:#ff00c818;}
+.giphy-back-btn:hover{background:#A78BFA18;}
 .giphy-tv-bar{height:3px;background:var(--border);border-radius:2px;flex-shrink:0;overflow:hidden;margin-top:2px;}
 .giphy-tv-progress{height:100%;background:var(--mag);width:0%;transition:width 0.25s linear;}
-#giphy-tv-btn.tv-active{color:var(--mag);border-color:var(--mag);background:#ff00c812;}
+#giphy-tv-btn.tv-active{color:var(--mag);border-color:var(--mag);background:#A78BFA12;}
 .pbadge.key-missing{opacity:0.35;filter:grayscale(0.8);}
 .pbadge.key-missing .dot{animation:none;background:#555;box-shadow:none;}
 .chat-input{flex:1;background:var(--bg2);border:1px solid var(--border);
@@ -591,7 +592,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .chat-send-btn{padding:5px 12px;background:none;border:1px solid var(--cyan);
   color:var(--cyan);font-family:var(--mono);font-size:10px;cursor:pointer;
   border-radius:3px;font-weight:600;align-self:flex-end;}
-.chat-send-btn:hover{background:#00f0ff18;}
+.chat-send-btn:hover{background:#22D3EE18;}
 /* ── TTS / STT controls ── */
 .chat-tts-row{display:flex;gap:5px;align-items:center;padding:3px 6px;flex-shrink:0;
   border-bottom:1px solid var(--border);background:#06090f;}
@@ -599,7 +600,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
   font-family:var(--mono);font-size:8px;padding:2px 4px;border-radius:3px;flex:1;max-width:150px;}
 .autospeak-btn{padding:2px 7px;background:none;border:1px solid var(--border);
   color:var(--dim);font-family:var(--mono);font-size:8px;cursor:pointer;border-radius:3px;flex-shrink:0;}
-.autospeak-btn.on{border-color:var(--mag);color:var(--mag);background:#ff00c812;}
+.autospeak-btn.on{border-color:var(--mag);color:var(--mag);background:#A78BFA12;}
 .autospeak-btn:hover{border-color:var(--cyan)44;}
 .mic-btn{padding:4px 9px;background:none;border:1px solid var(--border);color:var(--dim);
   font-family:var(--mono);font-size:12px;cursor:pointer;border-radius:3px;align-self:flex-end;flex-shrink:0;}
@@ -614,30 +615,30 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 /* ── ARDEN NEURAL LINK PANEL ── */
 @keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(100vh)}}
 @keyframes typing-dot{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
-@keyframes arden-glow{0%,100%{box-shadow:0 0 8px #00f0ff33,inset 0 0 20px #00f0ff05}
-  50%{box-shadow:0 0 16px #00f0ff55,inset 0 0 30px #00f0ff0a}}
+@keyframes arden-glow{0%,100%{box-shadow:0 0 8px #8B5CF633,inset 0 0 20px #8B5CF605}
+  50%{box-shadow:0 0 16px #8B5CF655,inset 0 0 30px #8B5CF60a}}
 @keyframes holo-drift{0%{background-position:0 0}100%{background-position:60px 60px}}
 
 .arden-panel-wrap{display:flex;flex-direction:column;height:100%;position:relative;overflow:hidden;
   background:radial-gradient(ellipse at top left,#001828 0%,#030810 60%);}
 /* Animated circuit grid overlay */
 .arden-panel-wrap::before{content:'';position:absolute;inset:0;
-  background-image:repeating-linear-gradient(0deg,transparent,transparent 29px,#00f0ff14 29px,#00f0ff14 30px),
-    repeating-linear-gradient(90deg,transparent,transparent 29px,#00f0ff14 29px,#00f0ff14 30px);
+  background-image:repeating-linear-gradient(0deg,transparent,transparent 29px,#22D3EE14 29px,#22D3EE14 30px),
+    repeating-linear-gradient(90deg,transparent,transparent 29px,#22D3EE14 29px,#22D3EE14 30px);
   animation:holo-drift 8s linear infinite;pointer-events:none;z-index:0;}
 /* Scan line */
 .arden-panel-wrap::after{content:'';position:absolute;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent 5%,#00f0ffaa 50%,transparent 95%);
+  background:linear-gradient(90deg,transparent 5%,#22D3EEaa 50%,transparent 95%);
   animation:scanline 6s linear infinite;pointer-events:none;z-index:1;}
 
 .arden-avatar-bar{display:flex;align-items:center;gap:10px;padding:7px 10px;
-  background:linear-gradient(135deg,#001828 0%,#020e1a 100%);
-  border-bottom:1px solid #00f0ff22;position:relative;z-index:2;flex-shrink:0;}
-.arden-avatar-img{width:52px;height:52px;border-radius:50%;border:2px solid #00f0ff99;
-  box-shadow:0 0 20px #00f0ff77,0 0 40px #00f0ff22,inset 0 0 12px #00f0ff22;object-fit:cover;
-  background:#001020;flex-shrink:0;animation:arden-glow 4s ease-in-out infinite;}
-.arden-avatar-name{font-family:var(--hud);font-size:14px;font-weight:900;color:var(--cyan);
-  text-shadow:0 0 12px var(--cyan),0 0 24px #00f0ff55;letter-spacing:3px;}
+  background:linear-gradient(135deg,#0c0618 0%,#050210 100%);
+  border-bottom:1px solid #8B5CF622;position:relative;z-index:2;flex-shrink:0;}
+.arden-avatar-img{width:52px;height:52px;border-radius:50%;border:2px solid #8B5CF699;
+  box-shadow:0 0 20px #8B5CF677,0 0 40px #8B5CF622,inset 0 0 12px #8B5CF622;object-fit:cover;
+  background:#0a0520;flex-shrink:0;animation:arden-glow 4s ease-in-out infinite;}
+.arden-avatar-name{font-family:var(--hud);font-size:14px;font-weight:900;color:var(--violet);
+  text-shadow:0 0 12px var(--violet),0 0 24px #8B5CF655;letter-spacing:3px;}
 .arden-avatar-subtitle{font-size:9px;color:#2a5070;letter-spacing:2px;margin-top:1px;}
 .arden-status-row{display:flex;align-items:center;gap:5px;margin-top:2px;}
 .arden-status-dot{width:6px;height:6px;border-radius:50%;background:var(--green);
@@ -651,84 +652,124 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .amsg-wrap.user-wrap{flex-direction:row-reverse;}
 .amsg-bubble{max-width:82%;padding:7px 11px;border-radius:4px;
   font-size:11px;line-height:1.55;word-break:break-word;}
-.amsg-bubble.arden-bubble{background:#030d18;border-left:2px solid var(--cyan);
-  box-shadow:0 0 10px #00f0ff0d,inset 0 0 15px #00f0ff05;}
+.amsg-bubble.arden-bubble{background:#050318;border-left:2px solid var(--violet);
+  box-shadow:0 0 10px #8B5CF60d,inset 0 0 15px #8B5CF605;}
 .amsg-bubble.user-bubble{background:#0c0518;border-right:2px solid var(--mag);
-  box-shadow:0 0 10px #ff00c80d,inset 0 0 15px #ff00c805;}
+  box-shadow:0 0 10px #A78BFA0d,inset 0 0 15px #A78BFA05;}
 .amsg-label{font-size:8px;font-family:var(--hud);letter-spacing:1px;margin-bottom:3px;}
-.amsg-label.arden-lbl{color:var(--cyan);text-shadow:0 0 6px var(--cyan);}
+.amsg-label.arden-lbl{color:var(--violet);text-shadow:0 0 6px var(--violet);}
 .amsg-label.user-lbl{color:var(--mag);text-align:right;text-shadow:0 0 6px var(--mag);}
 .amsg-text{color:var(--text);white-space:pre-wrap;}
 .amsg-ts{font-size:8px;color:#1a3050;margin-top:3px;}
 .amsg-ts.right{text-align:right;}
 .arden-typing-bubble{display:inline-flex;gap:4px;align-items:center;padding:2px 4px;}
-.arden-typing-bubble span{width:6px;height:6px;border-radius:50%;background:var(--cyan);opacity:.3;}
+.arden-typing-bubble span{width:6px;height:6px;border-radius:50%;background:var(--violet);opacity:.3;}
 .arden-typing-bubble span:nth-child(1){animation:typing-dot 1.2s .0s infinite;}
 .arden-typing-bubble span:nth-child(2){animation:typing-dot 1.2s .2s infinite;}
 .arden-typing-bubble span:nth-child(3){animation:typing-dot 1.2s .4s infinite;}
 
 .arden-input-bar{display:flex;gap:5px;padding:6px 7px;
-  background:#010810;border-top:1px solid #00f0ff1a;
+  background:#010810;border-top:1px solid #8B5CF61a;
   flex-shrink:0;position:relative;z-index:2;align-items:flex-end;}
-.arden-input{flex:1;background:#030f1c;border:1px solid #00f0ff2a;border-radius:3px;
+.arden-input{flex:1;background:#050210;border:1px solid #8B5CF62a;border-radius:3px;
   color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 9px;
   outline:none;resize:none;min-height:32px;max-height:80px;
   transition:border-color .2s,box-shadow .2s;}
-.arden-input:focus{border-color:#00f0ff66;box-shadow:0 0 10px #00f0ff1a;}
+.arden-input:focus{border-color:#8B5CF666;box-shadow:0 0 10px #8B5CF61a;}
 .arden-input::placeholder{color:#1a3050;}
-.arden-send-btn{padding:6px 13px;background:linear-gradient(135deg,#001828,#001020);
-  border:1px solid #00f0ff55;color:var(--cyan);font-family:var(--hud);font-size:10px;
+.arden-send-btn{padding:6px 13px;background:linear-gradient(135deg,#0c0618,#080210);
+  border:1px solid #8B5CF655;color:var(--violet);font-family:var(--hud);font-size:10px;
   font-weight:700;cursor:pointer;border-radius:3px;letter-spacing:1px;
-  text-shadow:0 0 8px var(--cyan);align-self:flex-end;
+  text-shadow:0 0 8px var(--violet);align-self:flex-end;
   transition:all .15s;white-space:nowrap;}
-.arden-send-btn:hover{background:linear-gradient(135deg,#001e30,#001428);
-  border-color:var(--cyan);box-shadow:0 0 12px #00f0ff44;}
+.arden-send-btn:hover{background:linear-gradient(135deg,#140828,#0c0618);
+  border-color:var(--violet);box-shadow:0 0 12px #8B5CF644;}
 .arden-send-btn:disabled{opacity:.35;cursor:not-allowed;box-shadow:none;}
-.arden-corner{position:absolute;width:16px;height:16px;border-color:var(--cyan);border-style:solid;opacity:1;filter:drop-shadow(0 0 5px #00f0ff);}
+.arden-corner{position:absolute;width:16px;height:16px;border-color:var(--violet);border-style:solid;opacity:1;filter:drop-shadow(0 0 5px #8B5CF6);}
 .arden-corner.tl{top:3px;left:3px;border-width:2px 0 0 2px;}
 .arden-corner.tr{top:3px;right:3px;border-width:2px 2px 0 0;}
 .arden-corner.bl{bottom:3px;left:3px;border-width:0 0 2px 2px;}
 .arden-corner.br{bottom:3px;right:3px;border-width:0 2px 2px 0;}
 .arden-msg-count{font-family:var(--hud);font-size:9px;color:#1a3a50;letter-spacing:1px;}
 .arden-mood-badge{font-size:8px;font-family:var(--hud);letter-spacing:1px;
-  padding:1px 5px;border-radius:2px;border:1px solid #00f0ff22;color:var(--purple);margin-left:4px;}
+  padding:1px 5px;border-radius:2px;border:1px solid #22D3EE22;color:var(--purple);margin-left:4px;}
 
 /* ── ARDEN PANEL-LEVEL GLOW OVERRIDE ── */
-[gs-id="arden-chat"] .panel{border:1px solid #00f0ff55!important;
-  box-shadow:0 0 35px #00f0ff1a,0 0 0 1px #00f0ff22,inset 0 0 40px #00001a60!important;
+[gs-id="arden-chat"] .panel{border:1px solid #8B5CF655!important;
+  box-shadow:0 0 35px #8B5CF61a,0 0 0 1px #8B5CF622,inset 0 0 40px #0a001a60!important;
   background:#020a14!important;}
-[gs-id="arden-chat"] .ph{background:linear-gradient(90deg,#001628,#002040,#001628)!important;
-  border-bottom:1px solid #00f0ff44!important;}
+[gs-id="arden-chat"] .ph{background:linear-gradient(90deg,#0c0618,#140828,#0c0618)!important;
+  border-bottom:1px solid #8B5CF644!important;}
 /* Arden upload bar embedded in tile */
-.arden-upload-bar{padding:5px 7px;border-top:1px solid #00f0ff1a;background:#010810;
+.arden-upload-bar{padding:5px 7px;border-top:1px solid #8B5CF61a;background:#010810;
   flex-shrink:0;position:relative;z-index:2;}
-.arden-upload-zone{border:1px dashed #00f0ff33;border-radius:3px;padding:5px 10px;
+.arden-upload-zone{border:1px dashed #8B5CF633;border-radius:3px;padding:5px 10px;
   text-align:center;font-size:9px;color:#2a5070;cursor:pointer;letter-spacing:1px;
   font-family:var(--mono);transition:all .2s;}
-.arden-upload-zone:hover,.arden-upload-zone.drag-over{border-color:var(--cyan);
-  color:var(--cyan);background:#00f0ff0a;}
+.arden-upload-zone:hover,.arden-upload-zone.drag-over{border-color:var(--violet);
+  color:var(--violet);background:#8B5CF60a;}
 .arden-upload-list{display:flex;flex-direction:column;gap:2px;margin-top:4px;
   max-height:56px;overflow-y:auto;}
 .arden-upl-item{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--dim);
-  background:#030d18;border:1px solid #00f0ff1a;border-radius:2px;padding:2px 6px;}
+  background:#030d18;border:1px solid #22D3EE1a;border-radius:2px;padding:2px 6px;}
 .arden-upl-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#5090a0;}
 .arden-upl-sz{color:#1a3050;flex-shrink:0;}
+/* ── ARDEN TTS ── */
+.arden-tts-toggle{background:none;border:1px solid #1a3050;color:#1a3050;font-size:13px;
+  padding:1px 5px;border-radius:3px;cursor:pointer;transition:all .25s;line-height:1;}
+.arden-tts-toggle.active{border-color:var(--violet);color:var(--violet);
+  box-shadow:0 0 8px #8B5CF644;text-shadow:0 0 6px var(--violet);}
+.arden-tts-toggle:hover{border-color:var(--violet);color:var(--violet);}
+.arden-speak-btn{background:none;border:none;color:#1a3050;font-size:11px;
+  cursor:pointer;padding:1px 3px;transition:all .2s;opacity:.5;vertical-align:middle;}
+.arden-speak-btn:hover{color:var(--violet);opacity:1;text-shadow:0 0 6px var(--violet);}
+.arden-speak-btn.playing{color:var(--violet);opacity:1;
+  animation:tts-pulse 1s ease-in-out infinite;text-shadow:0 0 8px var(--violet);}
+@keyframes tts-pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.arden-tts-stop{background:none;border:1px solid var(--red);color:var(--red);
+  font-family:var(--hud);font-size:8px;padding:1px 5px;border-radius:2px;
+  cursor:pointer;letter-spacing:1px;opacity:.7;transition:all .2s;}
+.arden-tts-stop:hover{opacity:1;background:#EF444412;}
+/* ── DICTATION / MIC ── */
+.mic-btn{width:30px;height:30px;background:none;border:1px solid var(--dim);
+  color:var(--dim);border-radius:50%;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;font-size:13px;
+  transition:all .3s;flex-shrink:0;position:relative;}
+.mic-btn:hover{border-color:var(--violet);color:var(--violet);}
+.mic-btn.listening{border-color:var(--violet);color:var(--violet);
+  animation:mic-pulse 1.5s ease-in-out infinite;
+  box-shadow:0 0 12px #8B5CF666,0 0 24px #8B5CF633;}
+.mic-btn.listening::after{content:"";position:absolute;inset:-4px;
+  border-radius:50%;border:2px solid var(--violet);opacity:0;
+  animation:mic-ring 1.5s ease-out infinite;}
+@keyframes mic-pulse{0%,100%{box-shadow:0 0 8px #8B5CF644,0 0 0 0 #8B5CF600}
+  50%{box-shadow:0 0 16px #8B5CF688,0 0 30px #8B5CF633}}
+@keyframes mic-ring{0%{transform:scale(1);opacity:.6}
+  100%{transform:scale(1.8);opacity:0}}
+.mic-status{position:absolute;bottom:calc(100% + 6px);left:50%;
+  transform:translateX(-50%);background:var(--bg2);border:1px solid var(--violet);
+  color:var(--violet);font-family:var(--hud);font-size:7px;letter-spacing:2px;
+  padding:2px 8px;border-radius:10px;white-space:nowrap;
+  pointer-events:none;opacity:0;transition:opacity .2s;}
+.mic-btn.listening .mic-status{opacity:1;}
+.mic-interim{color:var(--dim);font-style:italic;}
+.mic-btn.unsupported{display:none;}
 
 /* ── SESSIONS PANEL ── */
 .sessions-toolbar{display:flex;gap:4px;padding:5px 6px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .sess-save-btn{flex:1;padding:5px 6px;background:none;border:1px solid var(--cyan)66;
   color:var(--cyan);font-family:var(--mono);font-size:9px;cursor:pointer;border-radius:3px;
   letter-spacing:1px;transition:all .15s;}
-.sess-save-btn:hover{background:#00f0ff12;border-color:var(--cyan);}
+.sess-save-btn:hover{background:#22D3EE12;border-color:var(--cyan);}
 .sess-clr-btn{padding:5px 7px;background:none;border:1px solid var(--red)33;
   color:var(--red);font-family:var(--mono);font-size:10px;cursor:pointer;border-radius:3px;
   opacity:.5;transition:all .15s;}
-.sess-clr-btn:hover{opacity:1;background:#ff335512;}
+.sess-clr-btn:hover{opacity:1;background:#EF444412;}
 .sessions-list{flex:1;min-height:0;overflow-y:auto;padding:4px;display:flex;flex-direction:column;gap:3px;}
 .sess-item{background:#08111c;border:1px solid #1a2540;border-radius:4px;padding:7px 9px;
   cursor:pointer;transition:border-color .15s,background .15s;position:relative;}
-.sess-item:hover{border-color:#00f0ff33;background:#0a1828;}
-.sess-item.active{border-color:var(--cyan)66;background:#061020;box-shadow:0 0 8px #00f0ff1a;}
+.sess-item:hover{border-color:#22D3EE33;background:#0a1828;}
+.sess-item.active{border-color:var(--cyan)66;background:#061020;box-shadow:0 0 8px #22D3EE1a;}
 .sess-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;}
 .sess-ts{font-size:9px;color:var(--cyan);font-family:var(--hud);letter-spacing:.5px;}
 .sess-del{background:none;border:none;color:var(--red);cursor:pointer;font-size:11px;
@@ -764,6 +805,24 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .tg-status{display:flex;align-items:center;gap:7px;padding:4px 0;}
 .tg-dot{width:7px;height:7px;border-radius:50%;background:var(--red);}
 .tg-dot.on{background:var(--green);box-shadow:0 0 5px var(--green);animation:pulse 2s infinite;}
+/* ── Observer: camera snapshot button ─────────────────────────────── */
+.obs-btn{background:none;border:1px solid var(--border);color:var(--dim);
+  font-size:13px;width:26px;height:26px;border-radius:4px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .3s;
+  position:relative;}
+.obs-btn:hover{border-color:var(--violet);color:var(--violet);}
+.obs-btn.capturing{border-color:var(--violet);color:var(--violet);
+  animation:obs-pulse 1s ease-in-out infinite;
+  box-shadow:0 0 8px #8B5CF644;}
+.obs-btn.capturing::after{content:"";position:absolute;inset:-3px;
+  border-radius:6px;border:1.5px solid var(--violet);opacity:0;
+  animation:obs-ring 1s ease-out infinite;}
+@keyframes obs-pulse{0%,100%{opacity:1;}50%{opacity:.5;}}
+@keyframes obs-ring{0%{opacity:.6;transform:scale(1);}100%{opacity:0;transform:scale(1.3);}}
+.obs-status{position:absolute;top:-18px;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:7px;letter-spacing:1.5px;color:var(--violet);
+  white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none;}
+.obs-btn.capturing .obs-status{opacity:1;}
 </style>
 </head>
 <body>
@@ -785,7 +844,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
       background:transparent;border:1px solid var(--cyan)44;color:var(--cyan);
       font-family:inherit;font-size:10px;letter-spacing:3px;cursor:pointer;
       border-radius:4px;transition:all .2s;"
-      onmouseenter="this.style.background='#00f0ff11';this.style.borderColor='var(--cyan)'"
+      onmouseenter="this.style.background='#22D3EE11';this.style.borderColor='var(--cyan)'"
       onmouseleave="this.style.background='transparent';this.style.borderColor='var(--cyan)44'">
       AUTHENTICATE</button>
     <div id="login-err" style="color:var(--red);font-size:10px;margin-top:10px;min-height:14px;"></div>
@@ -840,7 +899,7 @@ async function ccLogin(){
     <div class="gsev" title="AI CORE STATUS — click to inspect"
       onclick="const p=document.getElementById('aicore-panel');p.scrollIntoView({behavior:'smooth',block:'nearest'});p.classList.add('sev-flash-ring');setTimeout(()=>p.classList.remove('sev-flash-ring'),2000);"
       style="cursor:pointer;padding:3px 8px;border-radius:4px;border:1px solid #1a254055;transition:background .2s;gap:6px;"
-      onmouseenter="this.style.background='#00f0ff0a'" onmouseleave="this.style.background=''">
+      onmouseenter="this.style.background='#22D3EE0a'" onmouseleave="this.style.background=''">
       <div class="gsev-dot" id="gsev-dot"></div>
       <div style="display:flex;flex-direction:column;line-height:1.2;">
         <span style="font-size:7px;color:var(--dim);letter-spacing:1px;">AI CORE</span>
@@ -853,6 +912,9 @@ async function ccLogin(){
              transition:border-color .2s,color .2s"
       onmouseenter="this.style.borderColor='var(--cyan)';this.style.color='var(--cyan)'"
       onmouseleave="this.style.borderColor='#1a2540';this.style.color='var(--dim)'">RESET TILES</button>
+    <button class="obs-btn" id="obs-btn" onclick="captureSnapshot()" title="Snapshot — capture dashboard for Arden's observer">
+      <span class="obs-status">CAPTURING...</span>&#128247;
+    </button>
     <div class="zoom-ctrl" title="UI zoom — persists across refreshes">
       <button class="zoom-btn" onclick="adjustZoom(-0.05)">&#8722;</button>
       <span class="zoom-val" id="zoom-val" onclick="resetZoom()" title="Click to reset to 133%">133%</span>
@@ -894,7 +956,7 @@ async function ccLogin(){
     <span class="sc-ico">&#8645;</span><span class="sc-lbl">ZONE</span></button>
   <div class="sc-sep"></div>
   <button class="sc-btn" data-tip="Arden Neural Link" onclick="document.querySelector('[gs-id=arden-chat]').scrollIntoView({behavior:'smooth'})"
-    style="border-color:#00f0ff44;">
+    style="border-color:#22D3EE44;">
     <span class="sc-ico" style="color:var(--cyan);">&#9670;</span><span class="sc-lbl" style="color:var(--cyan);">ARDEN</span></button>
   <button class="sc-btn" data-tip="LM Network Node" onclick="document.querySelector('[gs-id=lmstudio-net]').scrollIntoView({behavior:'smooth'})"
     style="border-color:#b060ff44;">
@@ -1036,7 +1098,7 @@ async function ccLogin(){
       <div class="gauge-w">
         <div class="gauge-ring">
           <svg viewBox="0 0 80 80"><circle class="gauge-bg" cx="40" cy="40" r="30" stroke-width="6"/>
-            <circle class="gauge-fill" id="g-cpu" cx="40" cy="40" r="30" stroke="#00f0ff"
+            <circle class="gauge-fill" id="g-cpu" cx="40" cy="40" r="30" stroke="#22D3EE"
               stroke-width="6" stroke-dasharray="188.5" stroke-dashoffset="188.5"/></svg>
           <div class="gauge-ctr c-c" id="g-cpu-lbl">—</div>
         </div>
@@ -1045,7 +1107,7 @@ async function ccLogin(){
       <div class="gauge-w">
         <div class="gauge-ring">
           <svg viewBox="0 0 80 80"><circle class="gauge-bg" cx="40" cy="40" r="30" stroke-width="6"/>
-            <circle class="gauge-fill" id="g-ram" cx="40" cy="40" r="30" stroke="#00ff88"
+            <circle class="gauge-fill" id="g-ram" cx="40" cy="40" r="30" stroke="#34D399"
               stroke-width="6" stroke-dasharray="188.5" stroke-dashoffset="188.5"/></svg>
           <div class="gauge-ctr c-g" id="g-ram-lbl">—</div>
         </div>
@@ -1054,7 +1116,7 @@ async function ccLogin(){
       <div class="gauge-w">
         <div class="gauge-ring">
           <svg viewBox="0 0 80 80"><circle class="gauge-bg" cx="40" cy="40" r="30" stroke-width="6"/>
-            <circle class="gauge-fill" id="g-gpu" cx="40" cy="40" r="30" stroke="#ff00c8"
+            <circle class="gauge-fill" id="g-gpu" cx="40" cy="40" r="30" stroke="#A78BFA"
               stroke-width="6" stroke-dasharray="188.5" stroke-dashoffset="188.5"/></svg>
           <div class="gauge-ctr c-m" id="g-gpu-lbl">—</div>
         </div>
@@ -1063,7 +1125,7 @@ async function ccLogin(){
       <div class="gauge-w">
         <div class="gauge-ring">
           <svg viewBox="0 0 80 80"><circle class="gauge-bg" cx="40" cy="40" r="30" stroke-width="6"/>
-            <circle class="gauge-fill" id="g-dsk" cx="40" cy="40" r="30" stroke="#ffaa00"
+            <circle class="gauge-fill" id="g-dsk" cx="40" cy="40" r="30" stroke="#F59E0B"
               stroke-width="6" stroke-dasharray="188.5" stroke-dashoffset="188.5"/></svg>
           <div class="gauge-ctr c-a" id="g-dsk-lbl">—</div>
         </div>
@@ -1463,10 +1525,11 @@ async function ccLogin(){
 <div class="grid-stack-item gsi" gs-id="arden-chat" gs-x="0" gs-y="28" gs-w="5" gs-h="14" gs-min-h="4">
 <div class="grid-stack-item-content gsic">
 <div class="panel" id="arden-chat-panel" style="display:flex;flex-direction:column;overflow:hidden;">
-  <div class="ph" style="background:linear-gradient(90deg,#001825,#03080f,#001825);border-bottom:1px solid #00f0ff33;flex-shrink:0;">
+  <div class="ph" style="background:linear-gradient(90deg,#001825,#03080f,#001825);border-bottom:1px solid #22D3EE33;flex-shrink:0;">
     <span class="pt" style="font-family:var(--hud);color:var(--cyan);text-shadow:0 0 10px var(--cyan);letter-spacing:2px;font-size:11px;">&#9670; ARDEN NEURAL LINK</span>
     <div class="phbtns">
       <span class="arden-msg-count" id="arden-msg-count">0 msgs</span>
+      <button class="arden-tts-toggle" id="arden-tts-btn" onclick="toggleArdenTTS()" title="Toggle Arden voice">&#128266;</button>
       <button class="cbtn" onclick="clearArdenChat()" title="Clear conversation" style="color:var(--red);opacity:.5;font-size:11px;">&#128465;</button>
       <button class="cbtn" onclick="toggleCollapse('arden-chat-panel')">&#9660;</button>
     </div>
@@ -1517,6 +1580,9 @@ async function ccLogin(){
     <div class="arden-input-bar">
       <textarea class="arden-input" id="arden-input" placeholder="Message Arden directly..." rows="1"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendArdenMsg();}"></textarea>
+      <button class="mic-btn" id="arden-mic" onclick="toggleArdenMic()" title="Voice input">
+        <span class="mic-status">LISTENING...</span>&#127908;
+      </button>
       <button class="arden-send-btn" id="arden-send-btn" onclick="sendArdenMsg()">&#9889; SEND</button>
     </div>
   </div>
@@ -1584,7 +1650,9 @@ async function ccLogin(){
       </select>
       <textarea class="chat-input" id="chat-input" placeholder="Message..." rows="1"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
-      <button class="mic-btn" id="mic-btn" onclick="toggleMic()" title="Speak your message (Chrome/Edge)">&#127908;</button>
+      <button class="mic-btn" id="mic-btn" onclick="toggleMic()" title="Speak your message (Chrome/Edge)">
+        <span class="mic-status">LISTENING...</span>&#127908;
+      </button>
       <button class="chat-send-btn" onclick="sendChat()" id="chat-send">SEND</button>
     </div>
   </div>
@@ -1705,6 +1773,10 @@ let _currentCh = 'main';
 // Arden Neural Link state
 let _ardenMsgs = [];
 let _ardenBusy = false;
+// Arden TTS state
+let _ardenTTS = localStorage.getItem('arden_tts') === '1';
+let _ardenAudio = null;
+let _ardenSpeakingBtn = null;
 // Sessions state
 let _sessions = [];
 let _lmStatus = {};
@@ -1904,6 +1976,10 @@ function handleEvent(type, data) {
     case 'avatar_update': renderAvatar(data); break;
     case 'upload_complete': fetch('/api/uploads').then(r=>r.json()).then(renderUploads); break;
     case 'quicklaunch_update': renderQuicklaunch(data); break;
+    case 'trigger_browser_snapshot':
+      console.log('[Observer] Snapshot requested via WebSocket', data);
+      if (typeof captureSnapshot === 'function') captureSnapshot();
+      break;
   }
 }
 
@@ -1917,10 +1993,10 @@ function gauge(id, pct) {
   const offset = circ - (pct/100)*circ;
   el.style.strokeDashoffset = offset;
   // color
-  let color = '#00ff88';
-  if(pct > 90) color='#ff3355';
-  else if(pct > 75) color='#ff8800';
-  else if(pct > 50) color='#ffaa00';
+  let color = '#34D399';
+  if(pct > 90) color='#EF4444';
+  else if(pct > 75) color='#FB923C';
+  else if(pct > 50) color='#F59E0B';
   el.setAttribute('stroke', color);
 }
 
@@ -2370,7 +2446,7 @@ function renderAvatar(a) {
   const statusColors = {idle:'c-d',happy:'c-g',thinking:'c-c',bored:'c-d',alert:'',error:'c-r'};
   const moodDisplay  = {idle:'NOMINAL',happy:'HAPPY',thinking:'FOCUSED',bored:'BORED',alert:'ELEVATED',error:'CRITICAL'};
   const moodColors   = {idle:'c-c',happy:'c-g',thinking:'c-c',bored:'c-d',alert:'',error:'c-r'};
-  const amber = 'var(--amber,#ffaa00)';
+  const amber = 'var(--amber,#F59E0B)';
   const stEl = document.getElementById('av-status');
   if(stEl){
     stEl.className='as-val '+(statusColors[mood]||'c-d');
@@ -2381,7 +2457,7 @@ function renderAvatar(a) {
   if(mEl){
     mEl.className='as-val '+(moodColors[mood]||'c-c');
     mEl.textContent=moodDisplay[mood]||mood.toUpperCase();
-    mEl.style.color=(mood==='alert')?amber:(mood==='thinking')?'var(--purple,#aa88ff)':'';
+    mEl.style.color=(mood==='alert')?amber:(mood==='thinking')?'var(--purple,#8B5CF6)':'';
   }
   // LAST ACT — update from routing call info if provided
   if(a.last_call_ts){
@@ -3281,6 +3357,86 @@ function toggleMic() {
   _micRecog.start();
 }
 
+// ── STT: Arden mic button ────────────────────────────────────────────────────
+let _ardenMicRecog     = null;
+let _ardenMicListening = false;
+
+function toggleArdenMic() {
+  const micBtn = document.getElementById('arden-mic');
+  if (_ardenMicListening) {
+    if (_ardenMicRecog) _ardenMicRecog.stop();
+    return;
+  }
+  if (!window.isSecureContext) {
+    showToast('Mic needs a secure context — open http://localhost:3000', 'warn', 6000);
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    showToast('Speech recognition not supported — use Chrome or Edge', 'warn');
+    return;
+  }
+  // Stop general chat mic if active
+  if (_micListening && _micRecog) _micRecog.stop();
+
+  _ardenMicRecog = new SR();
+  _ardenMicRecog.continuous     = true;
+  _ardenMicRecog.interimResults = true;
+  _ardenMicRecog.lang           = 'en-US';
+
+  let _ardenMicBase = '';
+
+  _ardenMicRecog.onstart = () => {
+    _ardenMicListening = true;
+    if (micBtn) micBtn.classList.add('listening');
+    const inp = document.getElementById('arden-input');
+    if (inp) _ardenMicBase = inp.value;
+  };
+  _ardenMicRecog.onresult = (e) => {
+    const inp = document.getElementById('arden-input');
+    if (!inp) return;
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    if (final) {
+      _ardenMicBase = (_ardenMicBase ? _ardenMicBase + ' ' : '') + final.trim();
+      inp.value = _ardenMicBase;
+      inp.classList.remove('mic-interim');
+    } else if (interim) {
+      inp.value = (_ardenMicBase ? _ardenMicBase + ' ' : '') + interim;
+      inp.classList.add('mic-interim');
+    }
+  };
+  _ardenMicRecog.onend = () => {
+    // Auto-restart if still supposed to be listening
+    if (_ardenMicListening) {
+      try { _ardenMicRecog.start(); } catch(e) {}
+      return;
+    }
+    if (micBtn) micBtn.classList.remove('listening');
+    const inp = document.getElementById('arden-input');
+    if (inp) inp.classList.remove('mic-interim');
+  };
+  _ardenMicRecog.onerror = (ev) => {
+    if (ev.error === 'not-allowed') {
+      showToast('Microphone access denied — allow mic in browser settings', 'warn', 5000);
+    }
+    _ardenMicListening = false;
+    if (micBtn) micBtn.classList.remove('listening');
+  };
+  _ardenMicRecog.start();
+}
+
+function stopArdenMic() {
+  _ardenMicListening = false;
+  if (_ardenMicRecog) { try { _ardenMicRecog.stop(); } catch(e) {} }
+  const btn = document.getElementById('arden-mic');
+  if (btn) btn.classList.remove('listening');
+}
+
 // ═══════════════════════════════════════════
 //  TOAST NOTIFICATION
 // ═══════════════════════════════════════════
@@ -3422,6 +3578,84 @@ function _ardenTimeStr(iso) {
   try { const d=new Date(iso); return d.toTimeString().slice(0,5); } catch{return '';}
 }
 
+// ── Arden TTS ───────────────────────────────────────────────────────
+function _ttsClean(text) {
+  // Strip markdown/emoji artifacts for natural speech
+  return text
+    .replace(/```[\s\S]*?```/g, ' code block omitted ')
+    .replace(/`[^`]+`/g, '')
+    .replace(/[*_~>#\-]{2,}/g, '')
+    .replace(/[\u25b8\u25c2\u26a0\u2318\u26a1\u2699\u2764\u2604]/g, '')
+    .replace(/\bhttps?:\/\/\S+/g, ' link ')
+    .replace(/\n{2,}/g, '. ')
+    .replace(/\n/g, ' ')
+    .trim()
+    .slice(0, 2000);
+}
+
+function toggleArdenTTS() {
+  _ardenTTS = !_ardenTTS;
+  localStorage.setItem('arden_tts', _ardenTTS ? '1' : '0');
+  const btn = document.getElementById('arden-tts-btn');
+  if (btn) btn.classList.toggle('active', _ardenTTS);
+  if (!_ardenTTS) stopArdenSpeak();
+  showToast(_ardenTTS ? 'Arden voice ON' : 'Arden voice OFF', 'info');
+}
+
+function _initArdenTTSBtn() {
+  const btn = document.getElementById('arden-tts-btn');
+  if (btn) btn.classList.toggle('active', _ardenTTS);
+}
+
+async function speakArden(text, btnEl) {
+  stopArdenSpeak();
+  const clean = _ttsClean(text);
+  if (!clean) return;
+  if (btnEl) { btnEl.classList.add('playing'); _ardenSpeakingBtn = btnEl; }
+  try {
+    const resp = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: clean }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || 'TTS error ' + resp.status);
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    _ardenAudio = new Audio(url);
+    _ardenAudio.onended = () => {
+      URL.revokeObjectURL(url);
+      _clearSpeakState();
+    };
+    _ardenAudio.onerror = () => {
+      URL.revokeObjectURL(url);
+      _clearSpeakState();
+    };
+    _ardenAudio.play();
+  } catch (e) {
+    _clearSpeakState();
+    showToast('TTS: ' + e.message, 'error');
+  }
+}
+
+function stopArdenSpeak() {
+  if (_ardenAudio) {
+    _ardenAudio.pause();
+    _ardenAudio.src = '';
+    _ardenAudio = null;
+  }
+  _clearSpeakState();
+}
+
+function _clearSpeakState() {
+  if (_ardenSpeakingBtn) {
+    _ardenSpeakingBtn.classList.remove('playing');
+    _ardenSpeakingBtn = null;
+  }
+}
+
 function renderArdenMsgs() {
   const container = document.getElementById('arden-msgs');
   if (!container) return;
@@ -3435,6 +3669,16 @@ function renderArdenMsgs() {
     const label = document.createElement('div');
     label.className = 'amsg-label ' + (isArden ? 'arden-lbl' : 'user-lbl');
     label.textContent = isArden ? '\u25b8 ARDEN' : 'YOU \u25c2';
+    // TTS speaker button for Arden messages
+    if (isArden && !msg.content.startsWith('\u26a0')) {
+      const spk = document.createElement('button');
+      spk.className = 'arden-speak-btn';
+      spk.innerHTML = '&#128266;';
+      spk.title = 'Speak this message';
+      const msgText = msg.content;
+      spk.onclick = () => speakArden(msgText, spk);
+      label.appendChild(spk);
+    }
     const txt = document.createElement('div');
     txt.className = 'amsg-text';
     txt.textContent = msg.content;
@@ -3526,6 +3770,12 @@ async function sendArdenMsg() {
   if (btn) { btn.disabled = false; btn.textContent = '\u26a1 SEND'; }
   _setArdenStatus('ONLINE', 'online');
   renderArdenMsgs();
+  // Auto-speak if TTS is enabled
+  const lastMsg = _ardenMsgs[_ardenMsgs.length - 1];
+  if (_ardenTTS && lastMsg && lastMsg.role === 'assistant' && !lastMsg.content.startsWith('\u26a0')) {
+    const lastSpkBtn = document.querySelector('#arden-msgs .amsg-wrap:last-child .arden-speak-btn');
+    speakArden(lastMsg.content, lastSpkBtn);
+  }
   // Persist to localStorage
   localStorage.setItem('arden_direct_v1', JSON.stringify(_ardenMsgs.slice(-100)));
 }
@@ -3702,8 +3952,9 @@ loadBudgetBalances();
 loadSavings();
 // Refresh budget + savings every 5 minutes
 setInterval(() => { loadBudgetBalances(); loadSavings(); }, 5 * 60 * 1000);
-// Arden Neural Link + Sessions
+// Arden Neural Link + Sessions + TTS
 _initArdenChat();
+_initArdenTTSBtn();
 loadSessions();
 // Keep avatar in sync with mood changes (poll every 15s)
 setInterval(() => {
@@ -3719,6 +3970,7 @@ setInterval(() => {
 <!-- ═══════════════════════════════════════
      GRIDSTACK — drag / resize / float
      ═══════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js"></script>
 <script>
 // ─── Default layout (matches data-gs-* attrs) ──────────────────────────────
@@ -3841,6 +4093,94 @@ function resetGridLayout() {
   grid.commit();
   // Save immediately so refresh preserves the layout
   try { localStorage.setItem('cc-grid-layout', JSON.stringify(grid.save(false))); } catch(e) {}
+}
+</script>
+
+<!-- ═══════════════════════════════════════
+     OBSERVER — Arden's dashboard snapshot
+     ═══════════════════════════════════════ -->
+<script>
+let _obsCapturing = false;
+
+async function captureSnapshot() {
+  if (_obsCapturing) return;
+  const btn = document.getElementById('obs-btn');
+  _obsCapturing = true;
+  btn.classList.add('capturing');
+
+  try {
+    // Capture the main grid container (the dashboard, not the whole page)
+    const target = document.querySelector('.grid-stack') || document.body;
+    const canvas = await html2canvas(target, {
+      backgroundColor: '#0a0a0f',
+      scale: 1,                    // 1x for reasonable file size
+      useCORS: true,
+      logging: false,
+      removeContainer: true,
+      // Ignore any overlays / modals that might interfere
+      ignoreElements: (el) => el.id === 'login-wall',
+    });
+
+    const dataUrl = canvas.toDataURL('image/png');
+
+    // Send to backend
+    const resp = await fetch('/api/observer/snapshot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl }),
+    });
+
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+    const result = await resp.json();
+    console.log('[Observer] Snapshot saved:', result.size_kb, 'KB');
+
+    // Brief success flash
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.style.borderColor = ''; btn.style.color = ''; }, 1500);
+
+  } catch (err) {
+    console.error('[Observer] Snapshot failed:', err);
+    btn.style.borderColor = 'var(--red)';
+    btn.style.color = 'var(--red)';
+    setTimeout(() => { btn.style.borderColor = ''; btn.style.color = ''; }, 2000);
+  } finally {
+    _obsCapturing = false;
+    btn.classList.remove('capturing');
+  }
+}
+
+// Arden can also request a layout map (spatial awareness without pixels)
+async function getLayoutMap() {
+  try {
+    // Get live tile positions from GridStack
+    const nodes = grid.engine.nodes || [];
+    const tilePositions = nodes.map(n => ({
+      id: n.id || n.el?.getAttribute('gs-id') || 'unknown',
+      x: n.x, y: n.y, w: n.w, h: n.h,
+    }));
+
+    // Get collapsed states
+    const collapsed = [];
+    document.querySelectorAll('.panel.collapsed').forEach(p => {
+      const gsi = p.closest('.gsi');
+      if (gsi) collapsed.push(gsi.getAttribute('gs-id'));
+    });
+
+    return {
+      timestamp: new Date().toISOString(),
+      gridColumns: 12,
+      cellHeight: 55,
+      tiles: tilePositions,
+      collapsedTiles: collapsed,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      zoom: document.body.style.zoom || '1',
+    };
+  } catch (err) {
+    console.error('[Observer] Layout map failed:', err);
+    return null;
+  }
 }
 </script>
 </body>

@@ -23,6 +23,8 @@ Key files:
 - `USER.md` – Who you are (Mike / Beanz / Jumpingbeanz)
 - `HEARTBEAT.md` – Optional periodic checks/tasks
 - `TOOLS.md` – Local notes about tools/devices
+- `DASHBOARD-REFERENCE.md` – Full technical reference for the Command Center dashboard (endpoints, tiles, auth, troubleshooting)
+-  – Full technical reference for the Command Center dashboard (endpoints, tiles, auth, troubleshooting)
 - `memory/` – Daily and long‑term notes (created as needed)
 
 You can safely:
