@@ -760,12 +760,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .bkt{font-size:8px;padding:0 4px;border-radius:2px;border:1px solid;}
 .bkt.ok{border-color:var(--green)44;color:var(--green);}
 .bkt.miss{border-color:var(--dim);color:var(--dim);}
-.upload-zone{border:1px dashed var(--border);border-radius:4px;padding:10px;
-  text-align:center;color:var(--dim);font-size:10px;cursor:pointer;transition:all .2s;}
-.upload-zone:hover{border-color:var(--cyan)55;color:var(--cyan);}
-.upload-list{display:flex;flex-direction:column;gap:2px;margin-top:5px;overflow-y:auto;max-height:80px;}
-.up-item{display:flex;justify-content:space-between;font-size:9px;padding:2px 5px;
-  background:#0a1020;border:1px solid var(--border);border-radius:2px;}
+/* (upload-zone/upload-list moved into .arden-upload-* classes) */
 .tg-status{display:flex;align-items:center;gap:7px;padding:4px 0;}
 .tg-dot{width:7px;height:7px;border-radius:50%;background:var(--red);}
 .tg-dot.on{background:var(--green);box-shadow:0 0 5px var(--green);animation:pulse 2s infinite;}
@@ -1407,7 +1402,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 <div id="arden-toast"></div>
 
 <!-- ZONE C: ARDEN NEURAL LINK -->
-<div class="grid-stack-item gsi" gs-id="arden-chat" gs-x="0" gs-y="28" gs-w="5" gs-h="17" gs-min-h="4">
+<div class="grid-stack-item gsi" gs-id="arden-chat" gs-x="0" gs-y="28" gs-w="5" gs-h="14" gs-min-h="4">
 <div class="grid-stack-item-content gsic">
 <div class="panel" id="arden-chat-panel" style="display:flex;flex-direction:column;overflow:hidden;">
   <div class="ph" style="background:linear-gradient(90deg,#001825,#03080f,#001825);border-bottom:1px solid #00f0ff33;flex-shrink:0;">
@@ -1589,7 +1584,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 </div>
 
 <!-- ZONE C: RIGHT PANEL (Telegram / Uploads / Registry) -->
-<div class="grid-stack-item gsi" gs-id="rightpanel" gs-x="0" gs-y="45" gs-w="4" gs-h="7" gs-min-h="2">
+<div class="grid-stack-item gsi" gs-id="rightpanel" gs-x="0" gs-y="42" gs-w="4" gs-h="7" gs-min-h="2">
 <div class="grid-stack-item-content gsic">
 <div class="panel" id="rightpanel-panel" style="overflow-y:auto;">
   <div class="ph">
@@ -3673,11 +3668,11 @@ const GRID_DEFAULTS = [
   {id:'media',      x:0,  y:20, w:4,  h:8 },
   {id:'giphy',      x:4,  y:20, w:3,  h:8 },
   {id:'notes',      x:7,  y:20, w:5,  h:8 },
-  {id:'arden-chat', x:0,  y:28, w:5,  h:17},
+  {id:'arden-chat', x:0,  y:28, w:5,  h:14},
   {id:'sessions',   x:5,  y:28, w:3,  h:14},
   {id:'chat',       x:8,  y:28, w:4,  h:14},
   {id:'lmstudio-net', x:4,  y:42, w:4,  h:10},
-  {id:'rightpanel',   x:0,  y:45, w:4,  h:7},
+  {id:'rightpanel',   x:0,  y:42, w:4,  h:7},
 ];
 
 // ─── Seed each gsi with its default h so expand can always restore ──────────
@@ -3702,8 +3697,23 @@ const grid = GridStack.init({
 (function loadGridLayout() {
   try {
     const saved = JSON.parse(localStorage.getItem('cc-grid-layout'));
-    if(saved && saved.length) grid.load(saved);
+    if(saved && saved.length) {
+      grid.load(saved);
+      return;  // saved layout is trusted — don't override
+    }
   } catch(e) {}
+  // No saved layout — force GRID_DEFAULTS with remove/re-add to bypass collision
+  grid.batchUpdate();
+  GRID_DEFAULTS.forEach(def => {
+    const gsi = document.querySelector(`.gsi[gs-id="${def.id}"]`);
+    if(gsi) {
+      grid.removeWidget(gsi, false);
+      grid.addWidget(gsi, { x:def.x, y:def.y, w:def.w, h:def.h, minH:1, id:def.id });
+    }
+  });
+  grid.commit();
+  // Save so next load uses the clean layout
+  try { localStorage.setItem('cc-grid-layout', JSON.stringify(grid.save(false))); } catch(e) {}
 })();
 
 // ─── After layout loaded, update origH for every uncollapsed item ────────────
