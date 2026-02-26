@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Database (local runtime data)
+*.db
+*.db-shm
+*.db-wal
+
+# Logs (runtime output)
+logs/
+
+# Node / Dashboard build artifacts
+dashboard/node_modules/
+dashboard/dist/
+
+# OpenClaw internal / sensitive
+.openclaw/
+
+# Avatar images (large binary files - use git-lfs or store separately)
+avatars/*.png
+avatars/*.jpg
+avatars/*.jpeg
+avatars/*.webp
+
+# Imports / temp
+imports/
+test.txt
+
+# OS
+.DS_Store
+Thumbs.db

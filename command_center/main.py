@@ -1344,10 +1344,74 @@ async def get_balances():
     """Return all manually-set provider bucket balances."""
     return db.get_provider_balances()
 
+def _parse_router_log_savings(cloud_in: float = 1.0, cloud_out: float = 3.0) -> dict:
+    """Parse the LLM router's request log for local model calls (lmstudio/ollama).
+    Returns {mtd_calls, mtd_tin, mtd_tout, all_calls, all_tin, all_tout}.
+    The router log lives at workspace/logs/router-requests.log.
+    Each line is a JSON object with 'provider' and 'estimated_tokens_in'.
+    """
+    import json as _json
+    from datetime import date as _date
+    log_path = "/home/mikegg/.openclaw/workspace/logs/router-requests.log"
+    period_start = _date.today().replace(day=1).isoformat()  # YYYY-MM-01
+    result = {"mtd_calls": 0, "mtd_tin": 0, "mtd_tout": 0,
+              "all_calls": 0, "all_tin": 0, "all_tout": 0}
+    try:
+        with open(log_path, "r", errors="replace") as fh:
+            for raw in fh:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    # Router uses Python dict repr (single quotes, True/False/None)
+                    import ast as _ast
+                    entry = _ast.literal_eval(raw)
+                except Exception:
+                    continue
+                if entry.get("provider") not in ("lmstudio", "ollama", "local"):
+                    continue
+                tin  = int(entry.get("estimated_tokens_in",  0) or 0)
+                tout = int(entry.get("estimated_tokens_out", tin) or tin)  # fallback = same as in
+                ts   = entry.get("timestamp", "")  # may or may not be present
+                result["all_calls"] += 1
+                result["all_tin"]   += tin
+                result["all_tout"]  += tout
+                # MTD: check timestamp field if present, else count all
+                if not ts or ts[:10] >= period_start:
+                    result["mtd_calls"] += 1
+                    result["mtd_tin"]   += tin
+                    result["mtd_tout"]  += tout
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        logger.debug(f"Router log savings parse error: {e}")
+    return result
+
 @app.get("/api/budget/savings")
 async def get_savings():
-    """Estimated savings from local LM vs equivalent cloud cost."""
-    return db.get_savings_summary()
+    """Estimated savings from local LM vs equivalent cloud cost.
+    Combines command-center DB calls (provider=local/lmstudio/ollama)
+    with calls logged directly by the LLM router (router-requests.log).
+    """
+    CLOUD_IN  = 1.0   # $ per 1M input tokens (mid-tier cloud baseline)
+    CLOUD_OUT = 3.0   # $ per 1M output tokens
+    base = db.get_savings_summary(cloud_in_rate=CLOUD_IN, cloud_out_rate=CLOUD_OUT)
+    router = _parse_router_log_savings(cloud_in=CLOUD_IN, cloud_out=CLOUD_OUT)
+
+    def _merge(base_section: dict, r_calls: int, r_tin: int, r_tout: int) -> dict:
+        calls = base_section["calls"] + r_calls
+        tin   = base_section["tokens_in"]  + r_tin
+        tout  = base_section["tokens_out"] + r_tout
+        est   = round((tin * CLOUD_IN + tout * CLOUD_OUT) / 1_000_000, 4)
+        return {"calls": calls, "tokens_in": tin, "tokens_out": tout,
+                "tokens_total": tin + tout, "actual_cost": 0.0,
+                "estimated_cloud_cost": est, "saved": est}
+
+    return {
+        "mtd":      _merge(base["mtd"],      router["mtd_calls"], router["mtd_tin"], router["mtd_tout"]),
+        "all_time": _merge(base["all_time"], router["all_calls"], router["all_tin"], router["all_tout"]),
+        "cloud_rate": base["cloud_rate"],
+    }
 
 @app.put("/api/budget/balance")
 async def set_balance(payload: dict):

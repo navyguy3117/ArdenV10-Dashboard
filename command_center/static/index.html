@@ -883,24 +883,27 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
         </div>
         <div class="prov-bal-val c-a" id="pbal-openrouter">—</div>
       </div>
-      <div class="prov-bal-box" style="border-color:var(--cyan)44">
+      <div class="prov-bal-box" style="border-color:var(--cyan)44" title="Project keys don't have billing API access. Click ↗ to update manually.">
         <div class="prov-bal-lbl" style="color:var(--cyan)">
           OPENAI
           <span class="prov-bal-src" id="pbal-src-openai">✎ MANUAL</span>
+          <a href="https://platform.openai.com/usage" target="_blank" style="color:var(--cyan);opacity:.5;font-size:8px;text-decoration:none;margin-left:3px" title="Open OpenAI billing">↗</a>
         </div>
         <div class="prov-bal-val c-c" id="pbal-openai">—</div>
       </div>
-      <div class="prov-bal-box" style="border-color:var(--mag)44">
+      <div class="prov-bal-box" style="border-color:var(--mag)44" title="Standard API keys don't expose balance endpoint. Click ↗ to update manually.">
         <div class="prov-bal-lbl" style="color:var(--mag)">
           ANTHROPIC
           <span class="prov-bal-src" id="pbal-src-anthropic">✎ MANUAL</span>
+          <a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:var(--mag);opacity:.5;font-size:8px;text-decoration:none;margin-left:3px" title="Open Anthropic billing">↗</a>
         </div>
         <div class="prov-bal-val c-m" id="pbal-anthropic">—</div>
       </div>
-      <div class="prov-bal-box" style="border-color:#4285f444">
+      <div class="prov-bal-box" style="border-color:#4285f444" title="No balance API available. Click ↗ to update manually.">
         <div class="prov-bal-lbl" style="color:var(--google)">
           GEMINI
           <span class="prov-bal-src" id="pbal-src-google">✎ MANUAL</span>
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4285f4;opacity:.5;font-size:8px;text-decoration:none;margin-left:3px" title="Open Google AI Studio">↗</a>
         </div>
         <div class="prov-bal-val" style="color:var(--google)" id="pbal-google">—</div>
       </div>
@@ -2964,6 +2967,9 @@ function escHtml(s) {
 loadCollapseStates();
 initWS();
 loadBudgetBalances();
+loadSavings();
+// Refresh budget + savings every 5 minutes
+setInterval(() => { loadBudgetBalances(); loadSavings(); }, 5 * 60 * 1000);
 </script>
 
 <!-- ═══════════════════════════════════════
