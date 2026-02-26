@@ -1,0 +1,7 @@
+/home/mikegg/.openclaw/workspace/router/**
+/home/mikegg/.openclaw/workspace/.openclaw/**
+**/*.env
+**/*secret*
+**/*token*
+systemd
+cron

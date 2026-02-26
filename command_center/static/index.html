@@ -622,19 +622,19 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
   background:radial-gradient(ellipse at top left,#001828 0%,#030810 60%);}
 /* Animated circuit grid overlay */
 .arden-panel-wrap::before{content:'';position:absolute;inset:0;
-  background-image:repeating-linear-gradient(0deg,transparent,transparent 29px,#00f0ff07 29px,#00f0ff07 30px),
-    repeating-linear-gradient(90deg,transparent,transparent 29px,#00f0ff07 29px,#00f0ff07 30px);
+  background-image:repeating-linear-gradient(0deg,transparent,transparent 29px,#00f0ff14 29px,#00f0ff14 30px),
+    repeating-linear-gradient(90deg,transparent,transparent 29px,#00f0ff14 29px,#00f0ff14 30px);
   animation:holo-drift 8s linear infinite;pointer-events:none;z-index:0;}
 /* Scan line */
-.arden-panel-wrap::after{content:'';position:absolute;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent 10%,#00f0ff30 50%,transparent 90%);
+.arden-panel-wrap::after{content:'';position:absolute;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent 5%,#00f0ffaa 50%,transparent 95%);
   animation:scanline 6s linear infinite;pointer-events:none;z-index:1;}
 
 .arden-avatar-bar{display:flex;align-items:center;gap:10px;padding:7px 10px;
   background:linear-gradient(135deg,#001828 0%,#020e1a 100%);
   border-bottom:1px solid #00f0ff22;position:relative;z-index:2;flex-shrink:0;}
-.arden-avatar-img{width:44px;height:44px;border-radius:50%;border:1px solid #00f0ff55;
-  box-shadow:0 0 14px #00f0ff44,inset 0 0 8px #00f0ff11;object-fit:cover;
+.arden-avatar-img{width:52px;height:52px;border-radius:50%;border:2px solid #00f0ff99;
+  box-shadow:0 0 20px #00f0ff77,0 0 40px #00f0ff22,inset 0 0 12px #00f0ff22;object-fit:cover;
   background:#001020;flex-shrink:0;animation:arden-glow 4s ease-in-out infinite;}
 .arden-avatar-name{font-family:var(--hud);font-size:14px;font-weight:900;color:var(--cyan);
   text-shadow:0 0 12px var(--cyan),0 0 24px #00f0ff55;letter-spacing:3px;}
@@ -684,14 +684,35 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .arden-send-btn:hover{background:linear-gradient(135deg,#001e30,#001428);
   border-color:var(--cyan);box-shadow:0 0 12px #00f0ff44;}
 .arden-send-btn:disabled{opacity:.35;cursor:not-allowed;box-shadow:none;}
-.arden-corner{position:absolute;width:8px;height:8px;border-color:var(--cyan);border-style:solid;opacity:.5;}
-.arden-corner.tl{top:4px;left:4px;border-width:1px 0 0 1px;}
-.arden-corner.tr{top:4px;right:4px;border-width:1px 1px 0 0;}
-.arden-corner.bl{bottom:4px;left:4px;border-width:0 0 1px 1px;}
-.arden-corner.br{bottom:4px;right:4px;border-width:0 1px 1px 0;}
+.arden-corner{position:absolute;width:16px;height:16px;border-color:var(--cyan);border-style:solid;opacity:1;filter:drop-shadow(0 0 5px #00f0ff);}
+.arden-corner.tl{top:3px;left:3px;border-width:2px 0 0 2px;}
+.arden-corner.tr{top:3px;right:3px;border-width:2px 2px 0 0;}
+.arden-corner.bl{bottom:3px;left:3px;border-width:0 0 2px 2px;}
+.arden-corner.br{bottom:3px;right:3px;border-width:0 2px 2px 0;}
 .arden-msg-count{font-family:var(--hud);font-size:9px;color:#1a3a50;letter-spacing:1px;}
 .arden-mood-badge{font-size:8px;font-family:var(--hud);letter-spacing:1px;
   padding:1px 5px;border-radius:2px;border:1px solid #00f0ff22;color:var(--purple);margin-left:4px;}
+
+/* ── ARDEN PANEL-LEVEL GLOW OVERRIDE ── */
+[gs-id="arden-chat"] .panel{border:1px solid #00f0ff55!important;
+  box-shadow:0 0 35px #00f0ff1a,0 0 0 1px #00f0ff22,inset 0 0 40px #00001a60!important;
+  background:#020a14!important;}
+[gs-id="arden-chat"] .ph{background:linear-gradient(90deg,#001628,#002040,#001628)!important;
+  border-bottom:1px solid #00f0ff44!important;}
+/* Arden upload bar embedded in tile */
+.arden-upload-bar{padding:5px 7px;border-top:1px solid #00f0ff1a;background:#010810;
+  flex-shrink:0;position:relative;z-index:2;}
+.arden-upload-zone{border:1px dashed #00f0ff33;border-radius:3px;padding:5px 10px;
+  text-align:center;font-size:9px;color:#2a5070;cursor:pointer;letter-spacing:1px;
+  font-family:var(--mono);transition:all .2s;}
+.arden-upload-zone:hover,.arden-upload-zone.drag-over{border-color:var(--cyan);
+  color:var(--cyan);background:#00f0ff0a;}
+.arden-upload-list{display:flex;flex-direction:column;gap:2px;margin-top:4px;
+  max-height:56px;overflow-y:auto;}
+.arden-upl-item{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--dim);
+  background:#030d18;border:1px solid #00f0ff1a;border-radius:2px;padding:2px 6px;}
+.arden-upl-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#5090a0;}
+.arden-upl-sz{color:#1a3050;flex-shrink:0;}
 
 /* ── SESSIONS PANEL ── */
 .sessions-toolbar{display:flex;gap:4px;padding:5px 6px;border-bottom:1px solid var(--border);flex-shrink:0;}
@@ -818,6 +839,13 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
   <div class="sc-sep"></div>
   <button class="sc-btn" data-tip="Toggle Zone B"     onclick="toggleZoneB()">
     <span class="sc-ico">&#8645;</span><span class="sc-lbl">ZONE</span></button>
+  <div class="sc-sep"></div>
+  <button class="sc-btn" data-tip="Arden Neural Link" onclick="document.querySelector('[gs-id=arden-chat]').scrollIntoView({behavior:'smooth'})"
+    style="border-color:#00f0ff44;">
+    <span class="sc-ico" style="color:var(--cyan);">&#9670;</span><span class="sc-lbl" style="color:var(--cyan);">ARDEN</span></button>
+  <button class="sc-btn" data-tip="LM Network Node" onclick="document.querySelector('[gs-id=lmstudio-net]').scrollIntoView({behavior:'smooth'})"
+    style="border-color:#b060ff44;">
+    <span class="sc-ico" style="color:var(--purple);">&#11053;</span><span class="sc-lbl" style="color:var(--purple);">LMN</span></button>
   <div id="ql-shortcuts" style="display:flex;gap:3px;align-items:center;"></div>
 </div>
 
@@ -1379,7 +1407,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 <div id="arden-toast"></div>
 
 <!-- ZONE C: ARDEN NEURAL LINK -->
-<div class="grid-stack-item gsi" gs-id="arden-chat" gs-x="0" gs-y="31" gs-w="5" gs-h="14" gs-min-h="4">
+<div class="grid-stack-item gsi" gs-id="arden-chat" gs-x="0" gs-y="31" gs-w="5" gs-h="17" gs-min-h="4">
 <div class="grid-stack-item-content gsic">
 <div class="panel" id="arden-chat-panel" style="display:flex;flex-direction:column;overflow:hidden;">
   <div class="ph" style="background:linear-gradient(90deg,#001825,#03080f,#001825);border-bottom:1px solid #00f0ff33;flex-shrink:0;">
@@ -1420,6 +1448,17 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
           <div class="amsg-text">Neural link established. All systems nominal — ready for your commands.</div>
         </div>
       </div>
+    </div>
+    <!-- Upload bar -->
+    <div class="arden-upload-bar" id="arden-upload-bar"
+      ondragover="event.preventDefault();this.querySelector('.arden-upload-zone').classList.add('drag-over')"
+      ondragleave="this.querySelector('.arden-upload-zone').classList.remove('drag-over')"
+      ondrop="event.preventDefault();this.querySelector('.arden-upload-zone').classList.remove('drag-over');ardenHandleDrop(event.dataTransfer.files)">
+      <div class="arden-upload-zone" onclick="document.getElementById('arden-file-input').click()">
+        &#8679; DROP FILE OR CLICK TO ATTACH
+        <input type="file" id="arden-file-input" style="display:none" onchange="ardenUploadFile(this)"/>
+      </div>
+      <div class="arden-upload-list" id="arden-upload-list"></div>
     </div>
     <!-- Input bar -->
     <div class="arden-input-bar">
@@ -1550,7 +1589,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 </div>
 
 <!-- ZONE C: RIGHT PANEL (Telegram / Uploads / Registry) -->
-<div class="grid-stack-item gsi" gs-id="rightpanel" gs-x="0" gs-y="45" gs-w="4" gs-h="10" gs-min-h="2">
+<div class="grid-stack-item gsi" gs-id="rightpanel" gs-x="0" gs-y="48" gs-w="4" gs-h="7" gs-min-h="2">
 <div class="grid-stack-item-content gsic">
 <div class="panel" id="rightpanel-panel" style="overflow-y:auto;">
   <div class="ph">
@@ -1570,15 +1609,6 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
       <span class="rp-lbl">Messages today</span>
       <span class="rp-val c-c" id="tg-msgs">—</span>
     </div>
-  </div>
-  <!-- Upload -->
-  <div class="rp-section">
-    <div class="rp-stitle">UPLOADS</div>
-    <div class="upload-zone" onclick="document.getElementById('file-input').click()">
-      &#8679; Drop file or click to upload
-      <input type="file" id="file-input" style="display:none" onchange="uploadFile(this)"/>
-    </div>
-    <div class="upload-list" id="upload-list"></div>
   </div>
   <!-- Provider Registry -->
   <div class="rp-section">
@@ -2529,12 +2559,12 @@ function renderRegistry(reg) {
 }
 
 function renderUploads(uploads) {
-  const el = document.getElementById('upload-list');
+  const el = document.getElementById('arden-upload-list');
   if(!el) return;
-  el.innerHTML = uploads.slice(0,5).map(u => `
-    <div class="up-item">
-      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${u.original_name}</span>
-      <span style="color:var(--dim);margin-left:4px">${fmtBytes(u.size)}</span>
+  el.innerHTML = uploads.slice(0,6).map(u => `
+    <div class="arden-upl-item">
+      <span class="arden-upl-name">&#9670; ${u.original_name}</span>
+      <span class="arden-upl-sz">${fmtBytes(u.size)}</span>
     </div>`).join('');
 }
 
@@ -3297,10 +3327,22 @@ function openTasksFolder() {
   fetch('/api/tasks/open-folder').catch(()=>{});
 }
 
-function uploadFile(input) {
+function uploadFile(input) { ardenUploadFile(input); }
+
+function ardenUploadFile(input) {
   if(!input.files || !input.files[0]) return;
   const fd = new FormData();
   fd.append('file', input.files[0]);
+  fetch('/api/upload',{method:'POST',body:fd})
+    .then(r=>r.json())
+    .then(()=>fetch('/api/uploads').then(r=>r.json()).then(renderUploads));
+  input.value='';
+}
+
+function ardenHandleDrop(files) {
+  if(!files || !files.length) return;
+  const fd = new FormData();
+  fd.append('file', files[0]);
   fetch('/api/upload',{method:'POST',body:fd})
     .then(r=>r.json())
     .then(()=>fetch('/api/uploads').then(r=>r.json()).then(renderUploads));
@@ -3631,11 +3673,11 @@ const GRID_DEFAULTS = [
   {id:'media',      x:0,  y:20, w:4,  h:8 },
   {id:'giphy',      x:4,  y:20, w:3,  h:8 },
   {id:'notes',      x:7,  y:20, w:5,  h:8 },
-  {id:'arden-chat', x:0,  y:31, w:5,  h:14},
+  {id:'arden-chat', x:0,  y:31, w:5,  h:17},
   {id:'sessions',   x:5,  y:31, w:3,  h:14},
   {id:'chat',       x:8,  y:31, w:4,  h:14},
   {id:'lmstudio-net', x:4,  y:45, w:4,  h:10},
-  {id:'rightpanel',   x:0,  y:45, w:4,  h:10},
+  {id:'rightpanel',   x:0,  y:48, w:4,  h:7},
 ];
 
 // ─── Seed each gsi with its default h so expand can always restore ──────────

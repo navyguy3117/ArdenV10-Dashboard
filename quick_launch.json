@@ -1,0 +1,32 @@
+[
+  {
+    "label": "Health Check",
+    "command": "trigger health_check",
+    "color": "#00ff88"
+  },
+  {
+    "label": "Daily Summary",
+    "command": "trigger daily_summary",
+    "color": "#ffaa00"
+  },
+  {
+    "label": "Clear Logs",
+    "command": "clear logs",
+    "color": "#6080a0"
+  },
+  {
+    "label": "Reload Avatars",
+    "command": "reload avatars",
+    "color": "#00f0ff"
+  },
+  {
+    "label": "Agent Status",
+    "command": "run claude_agent status check",
+    "color": "#ff00c8"
+  },
+  {
+    "label": "Budget Report",
+    "command": "trigger budget_report",
+    "color": "#aa88ff"
+  }
+]

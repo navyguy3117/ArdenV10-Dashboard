@@ -34,3 +34,5 @@ test.txt
 # OS
 .DS_Store
 Thumbs.db
+configs/openclaw-router.env
+configs/*.env

@@ -1,0 +1,20 @@
+# Optional systemd --user service file for the local LLM router
+# Location: /home/mikegg/.openclaw/workspace/configs/openclaw-router.service
+# Note: This file intentionally does NOT contain any API keys.
+
+[Unit]
+Description=OpenClaw Local LLM Router
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/mikegg/.openclaw/workspace
+ExecStart=uvicorn router.main:app --host 0.0.0.0 --port 8001
+Restart=on-failure
+
+# Environment variables (API keys) should be provided by your shell or an EnvironmentFile,
+# not stored directly here. Example (you configure this yourself):
+# Environment=OPENAI_API_KEY=... ANTHROPIC_API_KEY=... OPENROUTER_API_KEY=...
+
+[Install]
+WantedBy=default.target

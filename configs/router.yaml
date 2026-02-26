@@ -1,0 +1,205 @@
+# Router configuration for local LLM Router
+# Lives at: /home/mikegg/.openclaw/workspace/configs/router.yaml
+
+providers:
+  openai:
+    enabled: true
+    # Note: these IDs may evolve; adjust as needed.
+    tiers:
+      CHEAP_CHAT:
+        # Options: gpt-4.1-mini (very cheap, good quality)
+        default_model: gpt-4.1-mini
+        candidates:
+          - gpt-4.1-mini
+      CODE_PRIMARY:
+        # Strong coding models
+        default_model: gpt-4.1
+        candidates:
+          - gpt-4.1
+      REASONING_PRIMARY:
+        default_model: gpt-4.1
+        candidates:
+          - gpt-4.1
+      VISION_PRIMARY:
+        # Vision-capable model
+        default_model: gpt-4.1-mini
+        candidates:
+          - gpt-4.1-mini
+      FALLBACK_CHEAP:
+        default_model: gpt-4.1-mini
+        candidates:
+          - gpt-4.1-mini
+
+  anthropic:
+    enabled: true
+    tiers:
+      CHEAP_CHAT:
+        default_model: claude-3-haiku-20240307
+        candidates:
+          - claude-3-haiku-20240307
+      CODE_PRIMARY:
+        default_model: claude-3.5-sonnet-20240620
+        candidates:
+          - claude-3.5-sonnet-20240620
+      REASONING_PRIMARY:
+        # Anthropic preferred for deep reasoning
+        default_model: claude-3.5-sonnet-20240620
+        candidates:
+          - claude-3.5-sonnet-20240620
+      VISION_PRIMARY:
+        default_model: claude-3.5-sonnet-20240620
+        candidates:
+          - claude-3.5-sonnet-20240620
+      FALLBACK_CHEAP:
+        default_model: claude-3-haiku-20240307
+        candidates:
+          - claude-3-haiku-20240307
+
+  openrouter:
+    enabled: true
+    # NOTE: model ids here are examples; you can tune them as needed.
+    tiers:
+      CHEAP_CHAT:
+        default_model: openrouter/auto
+        candidates:
+          - openrouter/auto
+      CODE_PRIMARY:
+        default_model: openrouter/auto
+        candidates:
+          - openrouter/auto
+      REASONING_PRIMARY:
+        default_model: openrouter/auto
+        candidates:
+          - openrouter/auto
+      VISION_PRIMARY:
+        default_model: openrouter/auto
+        candidates:
+          - openrouter/auto
+      FALLBACK_CHEAP:
+        default_model: openrouter/auto
+        candidates:
+          - openrouter/auto
+
+  lmstudio:
+    enabled: true
+    # Local LM Studio on Gaming Rig (10.10.10.98:1234)
+    # Model is auto-detected from whatever is currently loaded.
+    tiers:
+      LOCAL_CHAT:
+        default_model: auto
+        candidates:
+          - auto
+      LOCAL_CODE:
+        default_model: auto
+        candidates:
+          - auto
+      FALLBACK_LOCAL:
+        default_model: auto
+        candidates:
+          - auto
+
+budget:
+  monthly_cap_per_provider_usd: 60.0
+  # Derived daily cap (monthly/30). Can be overridden per provider if needed.
+  daily_cap_per_provider_usd: 2.0
+  per_provider_overrides: {}
+
+  # Approximate cost per 1K tokens per model tier (rough estimates; tune as needed).
+  # Used only for safety; actual billing will differ.
+  cost_per_1k_tokens_usd:
+    openai:
+      gpt-4.1-mini: 0.15
+      gpt-4.1: 5.00
+    anthropic:
+      claude-3-haiku-20240307: 0.25
+      claude-3.5-sonnet-20240620: 3.00
+    openrouter:
+      openrouter/auto: 0.20
+
+routing:
+  # Default fallback order when primary provider is unavailable or over budget.
+  fallback_chain:
+    chat:
+      - [openrouter, CHEAP_CHAT]
+      - [openai, CHEAP_CHAT]
+      - [anthropic, CHEAP_CHAT]
+      - [lmstudio, LOCAL_CHAT]
+    code:
+      - [openai, CODE_PRIMARY]
+      - [anthropic, CODE_PRIMARY]
+      - [openrouter, CODE_PRIMARY]
+      - [lmstudio, LOCAL_CODE]
+    reasoning:
+      - [anthropic, REASONING_PRIMARY]
+      - [openai, REASONING_PRIMARY]
+      - [openrouter, REASONING_PRIMARY]
+    vision:
+      - [openai, VISION_PRIMARY]
+      - [anthropic, VISION_PRIMARY]
+      - [openrouter, VISION_PRIMARY]
+
+  # Default priority if not specified in metadata.
+  default_priority: normal
+
+  # Mapping hints for intent detection.
+  intent_keywords:
+    code:
+      - "code"
+      - "function"
+      - "script"
+      - "error"
+      - "stacktrace"
+      - "exception"
+    reasoning:
+      - "plan"
+      - "analyze"
+      - "design"
+      - "architecture"
+      - "tradeoff"
+    vision:
+      - "image"
+      - "screenshot"
+      - "vision"
+
+  # Verify/second-opinion behavior: must use a different provider than primary.
+  verify:
+    enforce_different_provider: true
+
+  # Routing overrides: honored when provided, unless budget caps would be violated.
+  overrides:
+    allow_route_override: true
+    allow_model_override: true
+
+
+tokens:
+  # Soft/hard token budgets per priority (approximate tokens, not exact).
+  priorities:
+    low:
+      target_input_tokens: 3000
+      hard_max_input_tokens: 6000
+    normal:
+      target_input_tokens: 6000
+      hard_max_input_tokens: 10000
+    high:
+      target_input_tokens: 9000
+      hard_max_input_tokens: 14000
+
+  summarizer:
+    # Default summarizer tier: use the cheapest tier.
+    summarizer_model_tier: FALLBACK_CHEAP
+    # When priority is high, use this tier instead for summarization.
+    summarizer_high_priority_tier: REASONING_PRIMARY
+    # Cap summary length (tokens) – router will pick a value within this range.
+    summary_min_tokens: 350
+    summary_max_tokens: 500
+
+logging:
+  request_log: logs/router-requests.log
+  error_log: logs/router-errors.log
+  context_log: logs/router-context.log
+  # For privacy, request contents are NOT logged by default.
+  log_request_bodies: false
+
+memory:
+  pins_file: memory/pins.md
+  summaries_dir: memory/router-summaries

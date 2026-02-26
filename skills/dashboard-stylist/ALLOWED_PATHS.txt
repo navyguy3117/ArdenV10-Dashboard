@@ -1,0 +1,1 @@
+/home/mikegg/.openclaw/workspace/dashboard/**
