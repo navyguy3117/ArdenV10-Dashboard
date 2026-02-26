@@ -560,7 +560,7 @@ class Database:
                        COALESCE(SUM(tokens_in),0)  as tin,
                        COALESCE(SUM(tokens_out),0) as tout
                 FROM routing_calls
-                WHERE provider IN ('local','lmstudio','ollama') AND date(timestamp) >= ?
+                WHERE provider IN ('local','lmstudio','ollama','lmstudio-net') AND date(timestamp) >= ?
             """, (period_start,)).fetchone()
 
             all_time = conn.execute("""
@@ -568,7 +568,7 @@ class Database:
                        COALESCE(SUM(tokens_in),0)  as tin,
                        COALESCE(SUM(tokens_out),0) as tout
                 FROM routing_calls
-                WHERE provider IN ('local','lmstudio','ollama')
+                WHERE provider IN ('local','lmstudio','ollama','lmstudio-net')
             """).fetchone()
 
             conn.close()

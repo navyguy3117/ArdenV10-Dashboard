@@ -1453,6 +1453,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
         <option value="openrouter">ROUTER</option>
         <option value="google">GEMINI</option>
         <option value="local">LOCAL</option>
+        <option value="lmstudio-net">LM NET</option>
       </select>
       <select class="chat-model-sel" id="chat-model">
         <option value="claude-3-5-haiku-20241022">Haiku 3.5</option>
@@ -1462,6 +1463,38 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
       <button class="mic-btn" id="mic-btn" onclick="toggleMic()" title="Speak your message (Chrome/Edge)">&#127908;</button>
       <button class="chat-send-btn" onclick="sendChat()" id="chat-send">SEND</button>
     </div>
+  </div>
+</div>
+</div>
+</div>
+
+<!-- ZONE D: LM STUDIO NETWORK (RTX 4090 / Proxmox) -->
+<div class="grid-stack-item gsi" gs-id="lmstudio-net" gs-x="4" gs-y="45" gs-w="4" gs-h="10" gs-min-h="1">
+<div class="grid-stack-item-content gsic">
+<div class="panel" id="lmstudio-net-panel">
+  <div class="ph">
+    <span class="pt" style="color:var(--green);">&#9685; LM NETWORK // 4090</span>
+    <div class="phbtns">
+      <span class="tile-meta" id="lmn-meta">OFFLINE</span>
+      <button class="cbtn" onclick="toggleCollapse('lmstudio-net-panel')">&#9660;</button>
+    </div>
+  </div>
+  <div class="lm-status">
+    <div class="lm-dot" id="lmn-dot"></div>
+    <span class="lm-label" id="lmn-label">OFFLINE</span>
+    <span style="font-size:9px;color:var(--dim);margin-left:auto">10.10.10.180:1234</span>
+  </div>
+  <div class="lm-model-list" id="lmn-model-list">
+    <div class="no-data">CHECKING...</div>
+  </div>
+  <div class="lm-actions">
+    <select class="lm-sel" id="lmn-load-sel"><option value="">-- select model to load --</option></select>
+    <button class="lm-btn load" onclick="lmnLoad()">LOAD</button>
+    <button class="lm-btn eject" onclick="lmnUnload()">EJECT</button>
+  </div>
+  <div class="lm-stats">
+    <div class="lm-stat"><div class="lm-stat-lbl">GPU</div><div class="lm-stat-val" id="lmn-gpu">RTX 4090</div></div>
+    <div class="lm-stat"><div class="lm-stat-lbl">NODE</div><div class="lm-stat-val" id="lmn-node" style="color:var(--green);font-size:8px;">PROXMOX</div></div>
   </div>
 </div>
 </div>
@@ -1543,6 +1576,7 @@ let _ardenBusy = false;
 // Sessions state
 let _sessions = [];
 let _lmStatus = {};
+let _lmNetStatus = {};
 let _cmdHistory = [], _cmdIdx = -1;
 
 // ═══════════════════════════════════════════
@@ -1701,8 +1735,9 @@ function handleEvent(type, data) {
       if(data.logs)     { _allLogs = data.logs; renderLogs(); }
       if(data.avatar)   renderAvatar(data.avatar);
       if(data.system)   renderHealth(data.system);
-      if(data.lmstudio) renderLMStudio(data.lmstudio);
-      if(data.telegram) renderTelegram(data.telegram);
+      if(data.lmstudio)     renderLMStudio(data.lmstudio);
+      if(data.lmstudio_net) renderLMNet(data.lmstudio_net);
+      if(data.telegram)     renderTelegram(data.telegram);
       if(data.notes)    document.getElementById('notes-area').value = data.notes;
       if(data.tasks)    renderTasks(data.tasks);
       if(data.local_pc) renderLocalPC(data.local_pc);
@@ -1719,8 +1754,9 @@ function handleEvent(type, data) {
       break;
     case 'budget_update': renderBudget(data); loadSavings(); break;
     case 'provider_balances': loadBudgetBalances(); break;
-    case 'lmstudio_update': renderLMStudio(data); break;
-    case 'telegram_update': renderTelegram(data); break;
+    case 'lmstudio_update':     renderLMStudio(data); break;
+    case 'lmstudio_net_update': renderLMNet(data);    break;
+    case 'telegram_update':     renderTelegram(data); break;
     case 'agent_update': renderAgents(data); break;
     case 'new_log': _allLogs.unshift(data); renderLogs(); break;
     case 'tasks_update': renderTasks(data); break;
@@ -2289,6 +2325,64 @@ function refreshLMStudio() {
   fetch('/api/lmstudio').then(r=>r.json()).then(renderLMStudio);
 }
 
+// ─── LM STUDIO NETWORK (RTX 4090 / Proxmox) ────────────────────────────────
+function renderLMNet(d) {
+  if(!d) return;
+  _lmNetStatus = d;
+  const dot      = document.getElementById('lmn-dot');
+  const lbl      = document.getElementById('lmn-label');
+  const meta     = document.getElementById('lmn-meta');
+  const modelList= document.getElementById('lmn-model-list');
+  const loadSel  = document.getElementById('lmn-load-sel');
+  if(dot)  dot.className = 'lm-dot' + (d.online ? ' on' : '');
+  if(lbl)  lbl.textContent  = d.online ? 'ONLINE'  : 'OFFLINE';
+  if(meta) meta.textContent = d.online ? 'ONLINE'  : 'OFFLINE';
+  setSeverity('lmstudio-net-panel', d.online ? 'ok' : 'warn');
+  if(!d.online) {
+    if(modelList) modelList.innerHTML = '<div class="no-data">OFFLINE — NO DATA</div>';
+    if(loadSel)   loadSel.innerHTML   = '<option value="">-- offline --</option>';
+    return;
+  }
+  const loaded    = d.loaded_models || (d.model ? [d.model] : []);
+  const notLoaded = d.not_loaded_models || [];
+  if(modelList) {
+    modelList.innerHTML = [
+      ...loaded.map(m => `<div class="lm-model"><span class="lm-model-id" title="${escHtml(m)}">${escHtml(m)}</span><span class="lm-model-state">&#9679; LOADED</span></div>`),
+      ...notLoaded.slice(0,6).map(m => `<div class="lm-model"><span class="lm-model-id" title="${escHtml(m)}">${escHtml(m)}</span><span class="lm-model-state unloaded">&#9675; idle</span></div>`)
+    ].join('') || '<div class="no-data">No models found</div>';
+  }
+  if(loadSel) {
+    const opts = notLoaded.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
+    loadSel.innerHTML = `<option value="">-- select to load --</option>${opts}`;
+  }
+}
+
+function lmnLoad() {
+  const sel     = document.getElementById('lmn-load-sel');
+  const modelId = sel ? sel.value : '';
+  if(!modelId) return;
+  fetch('/api/lmstudio-net/load', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({model: modelId})
+  }).then(r=>r.json()).then(()=>{
+    setTimeout(()=>fetch('/api/lmstudio-net').then(r=>r.json()).then(renderLMNet), 2000);
+  }).catch(e => console.error('LMNet load error:', e));
+}
+
+function lmnUnload() {
+  const loaded = (_lmNetStatus.loaded_models || []);
+  if(!loaded.length) return;
+  const instanceId = loaded[0];
+  fetch('/api/lmstudio-net/unload', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({instance_id: instanceId})
+  }).then(r=>r.json()).then(()=>{
+    setTimeout(()=>fetch('/api/lmstudio-net').then(r=>r.json()).then(renderLMNet), 2000);
+  }).catch(e => console.error('LMNet unload error:', e));
+}
+
 function renderTelegram(d) {
   if(!d) return;
   const dot = document.getElementById('tg-dot');
@@ -2764,6 +2858,11 @@ const CHAT_MODELS = {
   ],
   local: [
     {v:'local', l:'Auto (LM Studio)'},
+  ],
+  'lmstudio-net': [
+    {v:'cwc-mistral-nemo-12b-v2',                l:'Mistral Nemo 12B ★'},
+    {v:'deepseek-r1-distill-llama-8b-abliterated',l:'DeepSeek R1 8B'},
+    {v:'qwen2.5-coder-7b-instruct',              l:'Qwen 2.5 Coder 7B'},
   ],
 };
 function updateChatModels() {
@@ -3443,7 +3542,8 @@ const GRID_DEFAULTS = [
   {id:'arden-chat', x:0,  y:31, w:5,  h:14},
   {id:'sessions',   x:5,  y:31, w:3,  h:14},
   {id:'chat',       x:8,  y:31, w:4,  h:14},
-  {id:'rightpanel', x:0,  y:45, w:4,  h:10},
+  {id:'lmstudio-net', x:4,  y:45, w:4,  h:10},
+  {id:'rightpanel',   x:0,  y:45, w:4,  h:10},
 ];
 
 // ─── Seed each gsi with its default h so expand can always restore ──────────

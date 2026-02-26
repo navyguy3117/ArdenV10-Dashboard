@@ -117,11 +117,19 @@ db               = Database(DB_PATH)
 metrics_collector = MetricsCollector()
 avatar_manager   = AvatarManager(str(AVATARS_DIR))
 
+# Remote (on-network) LM Studio — 4090 in Ubuntu container on Proxmox
+LM_STUDIO_NET_URL = os.getenv("LM_STUDIO_NET_URL", "http://10.10.10.180:1234")
+
 # Mutable state
 _lm_studio_status: Dict  = {
     "online": False, "model": None, "loaded_models": [], "all_models": [],
     "vram_used": None, "checked_at": None, "url": None,
     "stats": {"tokens_per_second": None, "ttft_ms": None}
+}
+_lm_studio_net_status: Dict = {
+    "online": False, "model": None, "loaded_models": [], "all_models": [],
+    "not_loaded_models": [], "vram_used": None, "checked_at": None,
+    "url": LM_STUDIO_NET_URL, "label": "LM NETWORK // 4090",
 }
 _telegram_status: Dict   = {"connected": False, "last_message": None, "messages_today": 0,
                               "checked_at": None, "username": None}
@@ -691,6 +699,50 @@ async def lmstudio_poller():
             logger.error(f"LM Studio poller: {e}")
 
 
+async def lmstudio_net_poller():
+    """Poll the on-network LM Studio (RTX 4090, 10.10.10.180:1234)."""
+    global _lm_studio_net_status
+    while True:
+        try:
+            await asyncio.sleep(15)
+            url = f"{LM_STUDIO_NET_URL}/api/v0/models"
+            timeout = aiohttp.ClientTimeout(total=5)
+            try:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(url) as resp:
+                        if resp.status == 200:
+                            data = await resp.json(content_type=None)
+                            models_raw = data.get("data", [])
+                            loaded     = [m for m in models_raw if m.get("state") == "loaded"]
+                            not_loaded = [m for m in models_raw if m.get("state") != "loaded"]
+                            loaded_ids = [m["id"] for m in loaded]
+                            _lm_studio_net_status = {
+                                "online": True,
+                                "model": loaded_ids[0] if loaded_ids else None,
+                                "loaded_models": loaded_ids,
+                                "all_models": [m["id"] for m in models_raw],
+                                "not_loaded_models": [m["id"] for m in not_loaded],
+                                "vram_used": None,
+                                "checked_at": datetime.utcnow().isoformat(),
+                                "url": LM_STUDIO_NET_URL,
+                                "label": "LM NETWORK // 4090",
+                            }
+                        else:
+                            raise Exception(f"HTTP {resp.status}")
+            except Exception:
+                _lm_studio_net_status = {
+                    "online": False, "model": None, "loaded_models": [], "all_models": [],
+                    "not_loaded_models": [], "vram_used": None,
+                    "checked_at": datetime.utcnow().isoformat(),
+                    "url": LM_STUDIO_NET_URL, "label": "LM NETWORK // 4090",
+                }
+            await manager.broadcast("lmstudio_net_update", _lm_studio_net_status)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"LM Studio NET poller: {e}")
+
+
 async def telegram_poller():
     """
     Poll Telegram Bot API getMe endpoint to confirm bot is alive.
@@ -1112,6 +1164,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(metrics_broadcaster()),
         asyncio.create_task(avatar_updater()),
         asyncio.create_task(lmstudio_poller()),
+        asyncio.create_task(lmstudio_net_poller()),
         asyncio.create_task(telegram_poller()),
         asyncio.create_task(quicklaunch_watcher()),
         asyncio.create_task(heartbeat_checker()),
@@ -1182,6 +1235,7 @@ async def websocket_endpoint(ws: WebSocket):
                 "avatar":        avatar_manager.get_state(),
                 "system":        {**metrics_now, "gpu": gpu_now},
                 "lmstudio":      _lm_studio_status,
+                "lmstudio_net":  _lm_studio_net_status,
                 "telegram":      _telegram_status,
                 "quicklaunch":   _quick_launch_buttons,
                 "uploads":       db.get_uploads(),
@@ -1368,7 +1422,7 @@ def _parse_router_log_savings(cloud_in: float = 1.0, cloud_out: float = 3.0) -> 
                     entry = _ast.literal_eval(raw)
                 except Exception:
                     continue
-                if entry.get("provider") not in ("lmstudio", "ollama", "local"):
+                if entry.get("provider") not in ("lmstudio", "ollama", "local", "lmstudio-net"):
                     continue
                 tin  = int(entry.get("estimated_tokens_in",  0) or 0)
                 tout = int(entry.get("estimated_tokens_out", tin) or tin)  # fallback = same as in
@@ -1878,6 +1932,56 @@ async def lmstudio_unload(payload: dict):
         raise HTTPException(502, f"LM Studio unload failed: {e}")
 
 
+# ── API: LM Studio NETWORK (RTX 4090 on Proxmox, 10.10.10.180:1234) ─────────────
+@app.get("/api/lmstudio-net")
+async def get_lmstudio_net():
+    return _lm_studio_net_status
+
+@app.get("/api/lmstudio-net/models")
+async def lmstudio_net_models():
+    """List models from the on-network LM Studio (4090)."""
+    url = f"{LM_STUDIO_NET_URL}/api/v0/models"
+    try:
+        timeout = aiohttp.ClientTimeout(total=6)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url) as resp:
+                return await resp.json(content_type=None)
+    except Exception as e:
+        raise HTTPException(502, f"LM Studio NET unreachable: {e}")
+
+@app.post("/api/lmstudio-net/load")
+async def lmstudio_net_load(payload: dict):
+    model_id = payload.get("model", "").strip()
+    if not model_id:
+        raise HTTPException(400, "model field is required")
+    url = f"{LM_STUDIO_NET_URL}/api/v1/models/load"
+    try:
+        timeout = aiohttp.ClientTimeout(total=60)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, json={"model": model_id}) as resp:
+                data = await resp.json(content_type=None)
+                db.add_log(f"LM Studio NET LOAD: {model_id}", "INFO", "lmstudio-net")
+                return {"status": "ok", "model": model_id, "response": data}
+    except Exception as e:
+        raise HTTPException(502, f"LM Studio NET load failed: {e}")
+
+@app.post("/api/lmstudio-net/unload")
+async def lmstudio_net_unload(payload: dict):
+    instance_id = payload.get("instance_id", "").strip()
+    if not instance_id:
+        raise HTTPException(400, "instance_id field is required")
+    url = f"{LM_STUDIO_NET_URL}/api/v1/models/unload"
+    try:
+        timeout = aiohttp.ClientTimeout(total=15)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, json={"instance_id": instance_id}) as resp:
+                data = await resp.json(content_type=None)
+                db.add_log(f"LM Studio NET UNLOAD: {instance_id}", "INFO", "lmstudio-net")
+                return {"status": "ok", "instance_id": instance_id, "response": data}
+    except Exception as e:
+        raise HTTPException(502, f"LM Studio NET unload failed: {e}")
+
+
 # ── API: Tasks CRUD (enhanced) ─────────────────────────────────────────────────
 @app.delete("/api/tasks/{filename}")
 async def delete_task(filename: str):
@@ -1938,7 +2042,7 @@ async def chat_proxy(payload: dict):
     messages  = payload.get("messages", [])
     api_key   = payload.get("api_key") or get_api_key(provider)
 
-    if not api_key and provider not in ("local", "lmstudio"):
+    if not api_key and provider not in ("local", "lmstudio", "lmstudio-net"):
         raise HTTPException(400, f"No API key found for provider '{provider}'. "
                                  "Set the key in ~/.bashrc or openclaw.json.")
     if not messages:
@@ -2077,6 +2181,44 @@ async def chat_proxy(payload: dict):
                     raise HTTPException(resp.status,
                         err_body.get("message", f"LM Studio error {resp.status}"))
 
+            # ── LM Studio NETWORK (RTX 4090 on Proxmox) ──────────────────────────
+            elif provider == "lmstudio-net":
+                lm_model = model or (_lm_studio_net_status.get("model") or "")
+                url = f"{LM_STUDIO_NET_URL}/v1/chat/completions"
+                body = {"messages": messages}
+                if lm_model:
+                    body["model"] = lm_model
+                t0 = time.time()
+                async with session.post(url, json=body,
+                        headers={"Content-Type": "application/json"},
+                        timeout=aiohttp.ClientTimeout(total=120)) as resp:
+                    data = await resp.json(content_type=None)
+                    if resp.status == 200:
+                        choice = (data.get("choices") or [{}])[0]
+                        text = choice.get("message", {}).get("content", "")
+                        usage = data.get("usage", {})
+                        tin  = usage.get("prompt_tokens", 0)
+                        tout = usage.get("completion_tokens", 0)
+                        actual_model = data.get("model", lm_model)
+                        latency_ms = int((time.time() - t0) * 1000)
+                        call = db.add_routing_call(
+                            provider="lmstudio-net",
+                            model_name=lm_model or "lmstudio-net",
+                            agent_name=payload.get("agent_name", "chat"),
+                            tokens_in=tin, tokens_out=tout,
+                            cost_usd=0.0,
+                            latency_ms=latency_ms,
+                            actual_model=actual_model,
+                        )
+                        _add_routing_log(call)
+                        await manager.broadcast("routing_call", call)
+                        await manager.broadcast("budget_update", db.get_budget_summary())
+                        return {"reply": text, "model": actual_model,
+                                "tokens_in": tin, "tokens_out": tout}
+                    err_body = data.get("error", {})
+                    raise HTTPException(resp.status,
+                        err_body.get("message", f"LM Studio NET error {resp.status}"))
+
             # ── Google AI Studio (Gemini) ──────────────────────────────────────────
             elif provider == "google":
                 # Google GenerativeAI API — NOT OpenAI-compatible
@@ -2125,7 +2267,7 @@ async def chat_proxy(payload: dict):
                         err.get("message", f"Google AI error {resp.status}"))
 
             else:
-                raise HTTPException(400, f"Unknown provider '{provider}'. Use: anthropic, openai, openrouter, local, google")
+                raise HTTPException(400, f"Unknown provider '{provider}'. Use: anthropic, openai, openrouter, local, google, lmstudio-net")
 
     except HTTPException:
         raise
