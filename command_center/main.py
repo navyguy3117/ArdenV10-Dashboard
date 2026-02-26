@@ -118,18 +118,20 @@ metrics_collector = MetricsCollector()
 avatar_manager   = AvatarManager(str(AVATARS_DIR))
 
 # Remote (on-network) LM Studio — 4090 in Ubuntu container on Proxmox
-LM_STUDIO_NET_URL = os.getenv("LM_STUDIO_NET_URL", "http://10.10.10.180:1234")
+LM_STUDIO_NET_URL     = os.getenv("LM_STUDIO_NET_URL",     "http://10.10.10.180:1234")
+# GPU stats agent on the Proxmox node (gpu_stats_server.py on port 18765)
+LM_STUDIO_NET_GPU_URL = os.getenv("LM_STUDIO_NET_GPU_URL", "http://10.10.10.180:18765")
 
 # Mutable state
 _lm_studio_status: Dict  = {
     "online": False, "model": None, "loaded_models": [], "all_models": [],
-    "vram_used": None, "checked_at": None, "url": None,
-    "stats": {"tokens_per_second": None, "ttft_ms": None}
+    "not_loaded_models": [], "vram_used": None, "checked_at": None, "url": None,
+    "gpu": None, "stats": {"tokens_per_second": None, "ttft_ms": None}
 }
 _lm_studio_net_status: Dict = {
     "online": False, "model": None, "loaded_models": [], "all_models": [],
     "not_loaded_models": [], "vram_used": None, "checked_at": None,
-    "url": LM_STUDIO_NET_URL, "label": "LM NETWORK // 4090",
+    "url": LM_STUDIO_NET_URL, "label": "LM NETWORK // 4090", "gpu": None,
 }
 _telegram_status: Dict   = {"connected": False, "last_message": None, "messages_today": 0,
                               "checked_at": None, "username": None}
@@ -680,6 +682,8 @@ async def lmstudio_poller():
                                     "url": base,
                                     "checked_at": datetime.utcnow().isoformat(),
                                     "stats": _lm_studio_status.get("stats", {}),
+                                    # Attach local GPU metrics (already polled by system poller)
+                                    "gpu": _gpu_metrics if _gpu_metrics and _gpu_metrics.get("available") else None,
                                 }
                                 found = True
                                 break
@@ -691,6 +695,7 @@ async def lmstudio_poller():
                     "not_loaded_models": [], "vram_used": None, "url": None,
                     "checked_at": datetime.utcnow().isoformat(),
                     "stats": {},
+                    "gpu": _gpu_metrics if _gpu_metrics and _gpu_metrics.get("available") else None,
                 }
             await manager.broadcast("lmstudio_update", _lm_studio_status)
         except asyncio.CancelledError:
@@ -700,41 +705,72 @@ async def lmstudio_poller():
 
 
 async def lmstudio_net_poller():
-    """Poll the on-network LM Studio (RTX 4090, 10.10.10.180:1234)."""
+    """Poll the on-network LM Studio (RTX 4090, 10.10.10.180:1234).
+    Also polls gpu_stats_server.py on port 18765 for VRAM / GPU / temp data.
+    """
     global _lm_studio_net_status
     while True:
         try:
             await asyncio.sleep(15)
-            url = f"{LM_STUDIO_NET_URL}/api/v0/models"
             timeout = aiohttp.ClientTimeout(total=5)
+
+            # ── 1. Model list ───────────────────────────────────────────────
+            models_ok  = False
+            loaded_ids = []
+            all_ids    = []
+            not_loaded_ids = []
             try:
+                url = f"{LM_STUDIO_NET_URL}/api/v0/models"
                 async with aiohttp.ClientSession(timeout=timeout) as session:
                     async with session.get(url) as resp:
                         if resp.status == 200:
                             data = await resp.json(content_type=None)
-                            models_raw = data.get("data", [])
-                            loaded     = [m for m in models_raw if m.get("state") == "loaded"]
-                            not_loaded = [m for m in models_raw if m.get("state") != "loaded"]
-                            loaded_ids = [m["id"] for m in loaded]
-                            _lm_studio_net_status = {
-                                "online": True,
-                                "model": loaded_ids[0] if loaded_ids else None,
-                                "loaded_models": loaded_ids,
-                                "all_models": [m["id"] for m in models_raw],
-                                "not_loaded_models": [m["id"] for m in not_loaded],
-                                "vram_used": None,
-                                "checked_at": datetime.utcnow().isoformat(),
-                                "url": LM_STUDIO_NET_URL,
-                                "label": "LM NETWORK // 4090",
-                            }
+                            models_raw     = data.get("data", [])
+                            loaded         = [m for m in models_raw if m.get("state") == "loaded"]
+                            not_loaded     = [m for m in models_raw if m.get("state") != "loaded"]
+                            loaded_ids     = [m["id"] for m in loaded]
+                            all_ids        = [m["id"] for m in models_raw]
+                            not_loaded_ids = [m["id"] for m in not_loaded]
+                            models_ok = True
                         else:
                             raise Exception(f"HTTP {resp.status}")
             except Exception:
+                pass  # handled below
+
+            # ── 2. GPU stats from gpu_stats_server.py ───────────────────────
+            gpu_data = None
+            try:
+                gpu_timeout = aiohttp.ClientTimeout(total=3)
+                async with aiohttp.ClientSession(timeout=gpu_timeout) as gsession:
+                    async with gsession.get(f"{LM_STUDIO_NET_GPU_URL}/gpu") as gresp:
+                        if gresp.status == 200:
+                            gpu_data = await gresp.json(content_type=None)
+                            if not gpu_data.get("available"):
+                                gpu_data = None
+            except Exception:
+                pass  # GPU stats server not running yet — that's fine
+
+            # ── 3. Build status ─────────────────────────────────────────────
+            if models_ok:
+                _lm_studio_net_status = {
+                    "online": True,
+                    "model": loaded_ids[0] if loaded_ids else None,
+                    "loaded_models": loaded_ids,
+                    "all_models": all_ids,
+                    "not_loaded_models": not_loaded_ids,
+                    "vram_used": gpu_data.get("mem_used_mb") if gpu_data else None,
+                    "checked_at": datetime.utcnow().isoformat(),
+                    "url": LM_STUDIO_NET_URL,
+                    "label": "LM NETWORK // 4090",
+                    "gpu": gpu_data,
+                }
+            else:
                 _lm_studio_net_status = {
                     "online": False, "model": None, "loaded_models": [], "all_models": [],
                     "not_loaded_models": [], "vram_used": None,
                     "checked_at": datetime.utcnow().isoformat(),
                     "url": LM_STUDIO_NET_URL, "label": "LM NETWORK // 4090",
+                    "gpu": gpu_data,  # may still have GPU stats even if LM Studio is down
                 }
             await manager.broadcast("lmstudio_net_update", _lm_studio_net_status)
         except asyncio.CancelledError:

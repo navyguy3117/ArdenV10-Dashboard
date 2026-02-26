@@ -390,6 +390,22 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 .lm-stat{background:#0a1020;border:1px solid var(--border);padding:3px 6px;border-radius:3px;}
 .lm-stat-lbl{font-size:8px;color:var(--dim);}
 .lm-stat-val{font-size:10px;font-weight:600;color:var(--cyan);}
+/* GPU resource bar */
+.lm-gpu-block{margin-top:5px;background:#080d18;border:1px solid var(--border);
+  border-radius:4px;padding:5px 7px;}
+.lm-gpu-row{display:flex;align-items:center;gap:5px;margin-bottom:2px;}
+.lm-gpu-lbl{font-size:8px;color:var(--dim);width:32px;flex-shrink:0;}
+.lm-gpu-bar-wrap{flex:1;height:6px;background:#0d1a28;border-radius:3px;overflow:hidden;}
+.lm-gpu-bar{height:100%;border-radius:3px;transition:width .5s ease;}
+.lm-gpu-bar.vram{background:linear-gradient(90deg,var(--cyan),var(--purple));}
+.lm-gpu-bar.util{background:linear-gradient(90deg,var(--green),var(--amber));}
+.lm-gpu-val{font-size:9px;font-weight:600;color:var(--text);width:40px;text-align:right;flex-shrink:0;}
+.lm-gpu-meta{display:flex;gap:8px;margin-top:3px;flex-wrap:wrap;}
+.lm-gpu-chip{font-size:8px;color:var(--dim);background:#0a1020;padding:1px 5px;
+  border-radius:2px;border:1px solid var(--border);}
+.lm-gpu-chip span{color:var(--amber);}
+.lm-gpu-noagent{font-size:8px;color:var(--dim);text-align:center;padding:4px 0;
+  font-style:italic;}
 
 /* ── LOGS ── */
 .log-filters{display:flex;gap:3px;margin-bottom:5px;flex-shrink:0;}
@@ -1174,6 +1190,22 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
     <div class="lm-stat"><div class="lm-stat-lbl">TOKENS/SEC</div><div class="lm-stat-val" id="lm-tps">—</div></div>
     <div class="lm-stat"><div class="lm-stat-lbl">TTFT ms</div><div class="lm-stat-val" id="lm-ttft">—</div></div>
   </div>
+  <div class="lm-gpu-block" id="lm-gpu-block">
+    <div class="lm-gpu-row">
+      <div class="lm-gpu-lbl">VRAM</div>
+      <div class="lm-gpu-bar-wrap"><div class="lm-gpu-bar vram" id="lm-vram-bar" style="width:0%"></div></div>
+      <div class="lm-gpu-val" id="lm-vram-val">—</div>
+    </div>
+    <div class="lm-gpu-row">
+      <div class="lm-gpu-lbl">GPU%</div>
+      <div class="lm-gpu-bar-wrap"><div class="lm-gpu-bar util" id="lm-util-bar" style="width:0%"></div></div>
+      <div class="lm-gpu-val" id="lm-util-val">—</div>
+    </div>
+    <div class="lm-gpu-meta">
+      <div class="lm-gpu-chip">TEMP <span id="lm-temp-val">—</span></div>
+      <div class="lm-gpu-chip">PWR <span id="lm-pwr-val">—</span></div>
+    </div>
+  </div>
 </div>
 </div>
 </div>
@@ -1495,6 +1527,23 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
   <div class="lm-stats">
     <div class="lm-stat"><div class="lm-stat-lbl">GPU</div><div class="lm-stat-val" id="lmn-gpu">RTX 4090</div></div>
     <div class="lm-stat"><div class="lm-stat-lbl">NODE</div><div class="lm-stat-val" id="lmn-node" style="color:var(--green);font-size:8px;">PROXMOX</div></div>
+  </div>
+  <div class="lm-gpu-block" id="lmn-gpu-block">
+    <div class="lm-gpu-row">
+      <div class="lm-gpu-lbl">VRAM</div>
+      <div class="lm-gpu-bar-wrap"><div class="lm-gpu-bar vram" id="lmn-vram-bar" style="width:0%"></div></div>
+      <div class="lm-gpu-val" id="lmn-vram-val">—</div>
+    </div>
+    <div class="lm-gpu-row">
+      <div class="lm-gpu-lbl">GPU%</div>
+      <div class="lm-gpu-bar-wrap"><div class="lm-gpu-bar util" id="lmn-util-bar" style="width:0%"></div></div>
+      <div class="lm-gpu-val" id="lmn-util-val">—</div>
+    </div>
+    <div class="lm-gpu-meta">
+      <div class="lm-gpu-chip">TEMP <span id="lmn-temp-val">—</span></div>
+      <div class="lm-gpu-chip">PWR <span id="lmn-pwr-val">—</span></div>
+      <div class="lm-gpu-chip" id="lmn-agent-status" style="color:var(--dim)">AGENT OFFLINE</div>
+    </div>
   </div>
 </div>
 </div>
@@ -2292,6 +2341,8 @@ function renderLMStudio(d) {
     if(tps) tps.textContent = d.stats.tokens_per_second != null ? d.stats.tokens_per_second.toFixed(1) : '—';
     if(ttft) ttft.textContent = d.stats.ttft_ms != null ? d.stats.ttft_ms+'ms' : '—';
   }
+  // GPU resource block (RTX 5070 local — from system metrics attached by backend)
+  _renderGpuBlock('lm', d.gpu || null);
 }
 
 function lmLoad() {
@@ -2325,6 +2376,44 @@ function refreshLMStudio() {
   fetch('/api/lmstudio').then(r=>r.json()).then(renderLMStudio);
 }
 
+// ─── Shared GPU stats block renderer ────────────────────────────────────────
+function _renderGpuBlock(prefix, gpu) {
+  // prefix = 'lm' (local) or 'lmn' (network)
+  const vramBar  = document.getElementById(`${prefix}-vram-bar`);
+  const vramVal  = document.getElementById(`${prefix}-vram-val`);
+  const utilBar  = document.getElementById(`${prefix}-util-bar`);
+  const utilVal  = document.getElementById(`${prefix}-util-val`);
+  const tempEl   = document.getElementById(`${prefix}-temp-val`);
+  const pwrEl    = document.getElementById(`${prefix}-pwr-val`);
+  const agentEl  = document.getElementById(`${prefix}-agent-status`); // only on lmn
+
+  if(!gpu || !gpu.available) {
+    if(vramBar) vramBar.style.width = '0%';
+    if(vramVal) vramVal.textContent = '—';
+    if(utilBar) utilBar.style.width = '0%';
+    if(utilVal) utilVal.textContent = '—';
+    if(tempEl)  tempEl.textContent  = '—';
+    if(pwrEl)   pwrEl.textContent   = '—';
+    if(agentEl) { agentEl.textContent = 'AGENT OFFLINE'; agentEl.style.color = 'var(--dim)'; }
+    return;
+  }
+  // VRAM bar
+  const vramPct = gpu.mem_pct || 0;
+  const vramUsed  = gpu.mem_used_mb  ? (gpu.mem_used_mb  / 1024).toFixed(1) : '—';
+  const vramTotal = gpu.mem_total_mb ? (gpu.mem_total_mb / 1024).toFixed(1) : '—';
+  if(vramBar) vramBar.style.width = `${Math.min(vramPct, 100)}%`;
+  if(vramVal) vramVal.textContent  = `${vramUsed}/${vramTotal}G`;
+  // GPU utilisation bar
+  const utilPct = gpu.util_pct != null ? gpu.util_pct : 0;
+  if(utilBar) utilBar.style.width = `${Math.min(utilPct, 100)}%`;
+  if(utilVal) utilVal.textContent  = `${utilPct.toFixed(0)}%`;
+  // Temp & power chips
+  if(tempEl) tempEl.textContent = gpu.temp_c  != null ? `${gpu.temp_c.toFixed(0)}°C`  : '—';
+  if(pwrEl)  pwrEl.textContent  = gpu.power_w != null ? `${gpu.power_w.toFixed(0)}W`  : '—';
+  // Agent status chip (network tile only)
+  if(agentEl) { agentEl.textContent = 'AGENT OK'; agentEl.style.color = 'var(--green)'; }
+}
+
 // ─── LM STUDIO NETWORK (RTX 4090 / Proxmox) ────────────────────────────────
 function renderLMNet(d) {
   if(!d) return;
@@ -2341,6 +2430,7 @@ function renderLMNet(d) {
   if(!d.online) {
     if(modelList) modelList.innerHTML = '<div class="no-data">OFFLINE — NO DATA</div>';
     if(loadSel)   loadSel.innerHTML   = '<option value="">-- offline --</option>';
+    _renderGpuBlock('lmn', d.gpu || null);
     return;
   }
   const loaded    = d.loaded_models || (d.model ? [d.model] : []);
@@ -2355,6 +2445,8 @@ function renderLMNet(d) {
     const opts = notLoaded.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
     loadSel.innerHTML = `<option value="">-- select to load --</option>${opts}`;
   }
+  // GPU resource block (RTX 4090 remote — from gpu_stats_server.py on port 18765)
+  _renderGpuBlock('lmn', d.gpu || null);
 }
 
 function lmnLoad() {
