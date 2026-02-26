@@ -767,6 +767,64 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
 </style>
 </head>
 <body>
+<!-- ═══ Login Wall (hidden when auth disabled or already authenticated) ═══ -->
+<div id="login-wall" style="display:none;position:fixed;inset:0;z-index:99999;
+  background:radial-gradient(ellipse at center,#020c18 0%,#000509 100%);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;">
+  <div style="text-align:center;max-width:340px;">
+    <div style="font-size:12px;letter-spacing:6px;color:var(--cyan);margin-bottom:8px;">ARDEN // COMMAND CENTER</div>
+    <div style="width:80px;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);margin:0 auto 24px;"></div>
+    <div style="font-size:9px;letter-spacing:3px;color:var(--dim);margin-bottom:20px;">AUTHENTICATION REQUIRED</div>
+    <input id="login-pw" type="password" placeholder="Password"
+      style="width:100%;padding:10px 14px;background:#0a1428;border:1px solid var(--border);
+        border-radius:4px;color:var(--text);font-family:inherit;font-size:13px;
+        text-align:center;outline:none;transition:border-color .2s;"
+      onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--border)'"
+      onkeydown="if(event.key==='Enter')ccLogin()">
+    <button onclick="ccLogin()" style="margin-top:12px;width:100%;padding:8px;
+      background:transparent;border:1px solid var(--cyan)44;color:var(--cyan);
+      font-family:inherit;font-size:10px;letter-spacing:3px;cursor:pointer;
+      border-radius:4px;transition:all .2s;"
+      onmouseenter="this.style.background='#00f0ff11';this.style.borderColor='var(--cyan)'"
+      onmouseleave="this.style.background='transparent';this.style.borderColor='var(--cyan)44'">
+      AUTHENTICATE</button>
+    <div id="login-err" style="color:var(--red);font-size:10px;margin-top:10px;min-height:14px;"></div>
+  </div>
+</div>
+<script>
+(async function checkAuth(){
+  try {
+    const r = await fetch('/api/auth/check');
+    const d = await r.json();
+    if(!d.auth_required || d.authenticated) {
+      document.getElementById('login-wall').style.display='none';
+      document.getElementById('app').style.display='';
+    } else {
+      document.getElementById('login-wall').style.display='flex';
+      document.getElementById('app').style.display='none';
+      document.getElementById('login-pw').focus();
+    }
+  } catch(e) {
+    // Server unreachable — show dashboard anyway (offline/dev)
+    document.getElementById('login-wall').style.display='none';
+    document.getElementById('app').style.display='';
+  }
+})();
+async function ccLogin(){
+  const pw = document.getElementById('login-pw').value;
+  const err = document.getElementById('login-err');
+  err.textContent='';
+  try {
+    const r = await fetch('/api/auth/login',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({password:pw})});
+    if(!r.ok){ err.textContent='ACCESS DENIED'; return; }
+    document.getElementById('login-wall').style.display='none';
+    document.getElementById('app').style.display='';
+    initWS();  // reconnect WebSocket with new cookie
+  } catch(e){ err.textContent='CONNECTION ERROR'; }
+}
+</script>
 <div id="app">
 
 <!-- HEADER -->
@@ -1729,6 +1787,13 @@ function toggleCollapse(id) {
         const origMinH = parseInt(gsi.getAttribute('gs-min-h')) || 1;
         grid.update(gsi, { h: origH, minH: origMinH });
       }
+      // Float-up: briefly disable float so GridStack compacts tiles
+      // upward into gaps, then re-enable for free-drag positioning.
+      grid.float(false);          // triggers vertical compaction
+      requestAnimationFrame(() => {
+        grid.float(true);         // restore free-drag
+        saveGridLayout();
+      });
     }
   }
   const btn = el.querySelector('.cbtn[onclick*="toggleCollapse"]');
@@ -1781,7 +1846,8 @@ function updateGlobalSeverity(cpu, ram, budgetPct) {
 //  WEBSOCKET
 // ═══════════════════════════════════════════
 function initWS() {
-  const url = `ws://${location.host}/ws`;
+  const tok = (document.cookie.match(/cc_token=([^;]+)/)||[])[1] || '';
+  const url = `ws://${location.host}/ws` + (tok ? `?token=${tok}` : '');
   ws = new WebSocket(url);
   ws.onopen = () => {
     document.getElementById('ws-dot').classList.add('on');

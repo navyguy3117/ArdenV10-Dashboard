@@ -4,9 +4,12 @@ Fixes: LM Studio URL, Telegram Bot API, watchdog tasks folder
 New: /api/tasks endpoint, tasks folder watchdog, telegram Bot API polling
 """
 import asyncio
+import hashlib
+import hmac
 import json
 import logging
 import os
+import secrets
 import subprocess
 import threading
 import time
@@ -20,11 +23,11 @@ import aiohttp
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import (
-    FastAPI, File, HTTPException, Request,
+    Depends, FastAPI, File, HTTPException, Request,
     UploadFile, WebSocket, WebSocketDisconnect
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 try:
@@ -111,6 +114,61 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("command_center")
+
+# ── Authentication ────────────────────────────────────────────────────────────
+# Set CC_PASSWORD in .env (or env var) to enable the login wall.
+# If unset, auth is DISABLED (open access — local-dev mode).
+CC_PASSWORD     = os.getenv("CC_PASSWORD", "")          # plaintext or bcrypt hash
+CC_SECRET       = os.getenv("CC_SECRET", secrets.token_hex(32))  # JWT signing key
+CC_TOKEN_HOURS  = int(os.getenv("CC_TOKEN_HOURS", "24"))         # token TTL
+
+AUTH_ENABLED    = bool(CC_PASSWORD)
+
+import base64, struct
+
+def _jwt_encode(payload: dict) -> str:
+    """Minimal HS256 JWT — no external dependency."""
+    header = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').rstrip(b"=")
+    body   = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=")
+    sig_input = header + b"." + body
+    sig = base64.urlsafe_b64encode(
+        hmac.new(CC_SECRET.encode(), sig_input, hashlib.sha256).digest()
+    ).rstrip(b"=")
+    return (sig_input + b"." + sig).decode()
+
+def _jwt_decode(token: str) -> Optional[dict]:
+    """Verify HS256 JWT, return payload or None."""
+    try:
+        parts = token.encode().split(b".")
+        if len(parts) != 3:
+            return None
+        sig_input = parts[0] + b"." + parts[1]
+        expected  = base64.urlsafe_b64encode(
+            hmac.new(CC_SECRET.encode(), sig_input, hashlib.sha256).digest()
+        ).rstrip(b"=")
+        if not hmac.compare_digest(expected, parts[2]):
+            return None
+        # Pad base64
+        body = parts[1] + b"=" * (-len(parts[1]) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(body))
+        if payload.get("exp", 0) < time.time():
+            return None
+        return payload
+    except Exception:
+        return None
+
+def _check_password(provided: str) -> bool:
+    """Compare password — supports plaintext or simple SHA-256 hash."""
+    if CC_PASSWORD.startswith("sha256:"):
+        expected = CC_PASSWORD[7:]
+        return hmac.compare_digest(
+            hashlib.sha256(provided.encode()).hexdigest(), expected
+        )
+    return hmac.compare_digest(provided, CC_PASSWORD)
+
+# Paths that skip auth (login page, static assets, health)
+_PUBLIC_PREFIXES = ("/api/auth/", "/static/", "/avatars/", "/favicon")
+_PUBLIC_EXACT    = {"/", "/health"}
 
 # ── Singletons ─────────────────────────────────────────────────────────────────
 db               = Database(DB_PATH)
@@ -1242,9 +1300,81 @@ app = FastAPI(title="Arden // Command Center", version="1.1.0", lifespan=lifespa
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True,
-    allow_methods=["*"], allow_headers=["*"],
+    allow_origins=[
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        f"http://localhost:{PORT}", f"http://127.0.0.1:{PORT}",
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
 )
+
+# ─── Security headers ────────────────────────────────────────────────────────
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
+
+# ─── Auth middleware (only active when CC_PASSWORD is set) ────────────────────
+@app.middleware("http")
+async def auth_gate(request: Request, call_next):
+    if not AUTH_ENABLED:
+        return await call_next(request)
+    path = request.url.path
+    # Allow public paths (login, static, root page)
+    if path in _PUBLIC_EXACT or any(path.startswith(p) for p in _PUBLIC_PREFIXES):
+        return await call_next(request)
+    # Check Authorization header: Bearer <token>
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.removeprefix("Bearer ").strip() if auth_header.startswith("Bearer ") else ""
+    # Also accept ?token= query param (for WebSocket upgrades)
+    if not token:
+        token = request.query_params.get("token", "")
+    # Also accept cc_token cookie
+    if not token:
+        token = request.cookies.get("cc_token", "")
+    if not token or not _jwt_decode(token):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    return await call_next(request)
+
+# ─── Auth endpoints ──────────────────────────────────────────────────────────
+@app.post("/api/auth/login")
+async def auth_login(payload: dict):
+    pw = payload.get("password", "")
+    if not AUTH_ENABLED:
+        return {"token": "", "message": "Auth disabled"}
+    if not _check_password(pw):
+        raise HTTPException(401, "Invalid password")
+    token = _jwt_encode({
+        "sub": "admin",
+        "iat": int(time.time()),
+        "exp": int(time.time()) + CC_TOKEN_HOURS * 3600,
+    })
+    response = JSONResponse({"token": token, "expires_in": CC_TOKEN_HOURS * 3600})
+    response.set_cookie(
+        "cc_token", token, httponly=True, samesite="strict",
+        max_age=CC_TOKEN_HOURS * 3600,
+    )
+    return response
+
+@app.get("/api/auth/check")
+async def auth_check(request: Request):
+    if not AUTH_ENABLED:
+        return {"authenticated": True, "auth_required": False}
+    token = request.cookies.get("cc_token", "") or request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    payload = _jwt_decode(token) if token else None
+    return {"authenticated": payload is not None, "auth_required": True}
+
+@app.post("/api/auth/logout")
+async def auth_logout():
+    response = JSONResponse({"message": "Logged out"})
+    response.delete_cookie("cc_token")
+    return response
 
 if AVATARS_DIR.exists():
     app.mount("/avatars", StaticFiles(directory=str(AVATARS_DIR)), name="avatars")
@@ -1255,6 +1385,12 @@ STATIC_DIR = Path(__file__).parent / "static"
 # ── WebSocket ──────────────────────────────────────────────────────────────────
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
+    # Auth check for WebSocket (token via query param)
+    if AUTH_ENABLED:
+        token = ws.query_params.get("token", "")
+        if not token or not _jwt_decode(token):
+            await ws.close(code=1008, reason="Unauthorized")
+            return
     await manager.connect(ws)
     try:
         metrics_now = _last_metrics or {}
@@ -1624,23 +1760,43 @@ async def telegram_event(payload: dict):
 
 
 # ── API: File Upload ───────────────────────────────────────────────────────────
+MAX_UPLOAD_MB   = int(os.getenv("MAX_UPLOAD_MB", "100"))
+ALLOWED_UPLOAD_EXT = {
+    ".pdf", ".txt", ".csv", ".json", ".md", ".yaml", ".yml", ".toml",
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp",
+    ".py", ".js", ".ts", ".html", ".css", ".sh", ".env",
+    ".log", ".xml", ".zip", ".tar", ".gz",
+}
+
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(request: Request, file: UploadFile = File(...)):
+    _rate_check(f"upload:{request.client.host}", max_per_min=10)
     if not file.filename:
         raise HTTPException(400, "No file provided")
     safe_name = "".join(c for c in file.filename if c.isalnum() or c in "._- ").strip()
+    if not safe_name:
+        raise HTTPException(400, "Invalid filename")
+    # File type validation
+    ext = Path(safe_name).suffix.lower()
+    if ext and ext not in ALLOWED_UPLOAD_EXT:
+        raise HTTPException(400, f"File type '{ext}' not allowed")
     dest = UPLOADS_DIR / safe_name
     if dest.exists():
         dest = UPLOADS_DIR / f"{dest.stem}_{int(time.time())}{dest.suffix}"
         safe_name = dest.name
     size = 0
+    max_bytes = MAX_UPLOAD_MB * 1024 * 1024
     async with aiofiles.open(dest, "wb") as f:
         while True:
             chunk = await file.read(65536)
             if not chunk:
                 break
-            await f.write(chunk)
             size += len(chunk)
+            if size > max_bytes:
+                await f.close()
+                dest.unlink(missing_ok=True)
+                raise HTTPException(413, f"File exceeds {MAX_UPLOAD_MB}MB limit")
+            await f.write(chunk)
     record = db.add_upload(safe_name, file.filename, size, str(dest))
     log = db.add_log(f"File uploaded: {file.filename} ({size:,} bytes)", "SUCCESS", "system")
     await manager.broadcast("upload_complete", record)
@@ -2069,10 +2225,23 @@ async def create_task_from_note(payload: dict):
     return {"status": "created", "filename": filename, "path": str(path)}
 
 
+# ── Simple rate limiter (in-memory, per-endpoint) ─────────────────────────────
+_rate_buckets: Dict[str, list] = {}
+
+def _rate_check(key: str, max_per_min: int = 15):
+    """Raise 429 if limit exceeded. Cleans entries older than 60s."""
+    now = time.time()
+    bucket = _rate_buckets.setdefault(key, [])
+    _rate_buckets[key] = [t for t in bucket if now - t < 60]
+    if len(_rate_buckets[key]) >= max_per_min:
+        raise HTTPException(429, f"Rate limit: max {max_per_min} requests/min")
+    _rate_buckets[key].append(now)
+
 # ── API: Chat ──────────────────────────────────────────────────────────────────
 @app.post("/api/chat")
-async def chat_proxy(payload: dict):
+async def chat_proxy(request: Request, payload: dict):
     """Proxy chat requests to Anthropic / OpenAI / OpenRouter."""
+    _rate_check(f"chat:{request.client.host}", max_per_min=15)
     provider  = payload.get("provider", "anthropic").lower()
     model     = payload.get("model", "claude-3-5-haiku-20241022")
     messages  = payload.get("messages", [])
@@ -2590,7 +2759,8 @@ async def clear_sessions():
 
 # ── API: Command ───────────────────────────────────────────────────────────────
 @app.post("/api/command")
-async def execute_command(payload: dict):
+async def execute_command(request: Request, payload: dict):
+    _rate_check(f"cmd:{request.client.host}", max_per_min=20)
     cmd = payload.get("command", "").strip()
     if not cmd:
         raise HTTPException(400, "command is required")
